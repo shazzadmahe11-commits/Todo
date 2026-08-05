@@ -1,20 +1,27 @@
 export type Recurrence = "none" | "daily" | "weekly" | "monthly";
 
+export interface Subtask {
+  id: string;
+  task_id: string;
+  title: string;
+  completed: boolean;
+  position: number;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   title: string;
   recurrence: Recurrence;
   archived: boolean;
+  due_date: string | null;
   created_at: string;
   last_completed_on: string | null;
+  subtasks: Subtask[];
 }
 
-// Returns YYYY-MM-DD for "today" — computed on whichever machine calls it.
-// Client and server both just use the browser/server's local date, which is
-// fine for a single-user personal app.
 export function todayStr(): string {
-  const d = new Date();
-  return toDateStr(d);
+  return toDateStr(new Date());
 }
 
 export function toDateStr(d: Date): string {
@@ -26,8 +33,7 @@ export function toDateStr(d: Date): string {
 
 function startOfWeek(d: Date): Date {
   const copy = new Date(d);
-  const dow = copy.getDay(); // 0 = Sunday
-  const diff = (dow + 6) % 7; // days since Monday
+  const diff = (copy.getDay() + 6) % 7;
   copy.setDate(copy.getDate() - diff);
   copy.setHours(0, 0, 0, 0);
   return copy;
@@ -37,30 +43,34 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-// A task is "pending" (should show in the active list) if it has never been
-// completed in its current recurrence window.
 export function isPending(task: Task, now: Date = new Date()): boolean {
   if (!task.last_completed_on) return true;
-
   const last = new Date(task.last_completed_on + "T00:00:00");
-
   switch (task.recurrence) {
-    case "none":
-      return false; // one-off tasks are archived on completion, but just in case
-    case "daily":
-      return toDateStr(last) !== toDateStr(now);
-    case "weekly":
-      return last < startOfWeek(now);
-    case "monthly":
-      return last < startOfMonth(now);
-    default:
-      return true;
+    case "none":    return false;
+    case "daily":   return toDateStr(last) !== toDateStr(now);
+    case "weekly":  return last < startOfWeek(now);
+    case "monthly": return last < startOfMonth(now);
+    default:        return true;
   }
 }
 
+export function dueSoonLabel(due: string | null): string | null {
+  if (!due) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(due + "T00:00:00");
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  if (diff < 0)  return "Overdue";
+  if (diff === 0) return "Due today";
+  if (diff === 1) return "Due tomorrow";
+  if (diff <= 7)  return `Due in ${diff} days`;
+  return null; // far away — don't clutter the UI
+}
+
 export const RECURRENCE_LABELS: Record<Recurrence, string> = {
-  none: "One-time",
-  daily: "Daily",
-  weekly: "Weekly",
+  none:    "One-time",
+  daily:   "Daily",
+  weekly:  "Weekly",
   monthly: "Monthly",
 };
