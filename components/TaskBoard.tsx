@@ -41,7 +41,6 @@ export default function TaskBoard() {
     for (const t of tasks) {
       (isPending(t, now) ? pending : done).push(t);
     }
-    // sort pending: overdue first, then by due date, then by created_at
     pending.sort((a, b) => {
       const da = a.due_date ?? "9999-99-99";
       const db = b.due_date ?? "9999-99-99";
@@ -93,9 +92,8 @@ export default function TaskBoard() {
 
   async function deleteTask(id: string) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
-    try {
-      await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-    } catch { await loadTasks(); }
+    try { await fetch(`/api/tasks/${id}`, { method: "DELETE" }); }
+    catch { await loadTasks(); }
   }
 
   async function saveTaskEdit(id: string, updates: { title?: string; recurrence?: Recurrence; due_date?: string | null }) {
@@ -142,27 +140,26 @@ export default function TaskBoard() {
       ...t,
       subtasks: t.subtasks.filter((s) => s.id !== subtaskId),
     })));
-    try {
-      await fetch(`/api/subtasks/${subtaskId}`, { method: "DELETE" });
-    } catch { await loadTasks(); }
+    try { await fetch(`/api/subtasks/${subtaskId}`, { method: "DELETE" }); }
+    catch { await loadTasks(); }
   }
 
   return (
     <div>
       {/* Add task form */}
       <form onSubmit={addTask} className="mb-10 flex flex-col gap-3">
-        <div className="flex gap-2 border-b border-line pb-2 focus-within:border-ink">
+        <div className="flex gap-2 border-b border-line pb-2 focus-within:border-gradA transition-colors">
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Add something to do…"
-            className="flex-1 bg-transparent font-body text-base text-ink placeholder:text-muted focus:outline-none"
+            className="flex-1 bg-transparent font-body text-base text-bright placeholder:text-muted focus:outline-none"
             maxLength={200}
           />
           <button
             type="submit"
             disabled={!title.trim() || submitting}
-            className="font-mono text-xs uppercase tracking-wider text-accent disabled:text-muted"
+            className="font-mono text-xs uppercase tracking-wider grad-text disabled:text-muted disabled:[background:none] disabled:[-webkit-text-fill-color:#5A5A72]"
           >
             Add
           </button>
@@ -172,7 +169,9 @@ export default function TaskBoard() {
             {RECURRENCE_OPTIONS.map((opt) => (
               <button type="button" key={opt} onClick={() => setRecurrence(opt)}
                 className={`rounded-sm px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide transition-colors ${
-                  recurrence === opt ? "bg-accent text-paper" : "bg-accentSoft text-accent hover:bg-accent/20"
+                  recurrence === opt
+                    ? "bg-grad text-paper"
+                    : "bg-surface text-soft border border-line hover:border-gradA"
                 }`}>
                 {RECURRENCE_LABELS[opt]}
               </button>
@@ -182,7 +181,7 @@ export default function TaskBoard() {
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="ml-auto rounded-sm border border-line bg-transparent px-2 py-1 font-mono text-[11px] text-muted focus:border-accent focus:text-ink focus:outline-none"
+            className="ml-auto rounded-sm border border-line bg-surface px-2 py-1 font-mono text-[11px] text-muted focus:border-gradA focus:text-bright focus:outline-none"
             title="Due date (optional)"
           />
         </div>
@@ -237,8 +236,6 @@ export default function TaskBoard() {
   );
 }
 
-// ─── TaskRow ─────────────────────────────────────────────────────────────────
-
 function TaskRow({
   task, completed = false,
   onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask,
@@ -273,11 +270,7 @@ function TaskRow({
   function commitEdit() {
     const trimmed = editTitle.trim();
     if (!trimmed) return;
-    onSave({
-      title: trimmed,
-      recurrence: editRecurrence,
-      due_date: editDue || null,
-    });
+    onSave({ title: trimmed, recurrence: editRecurrence, due_date: editDue || null });
     setEditing(false);
   }
 
@@ -295,14 +288,16 @@ function TaskRow({
   const doneSubtasks = task.subtasks.filter((s) => s.completed).length;
 
   return (
-    <li className="group rounded border border-transparent hover:border-line hover:bg-accentSoft/30">
-      {/* Main row */}
+    <li className="group rounded border border-transparent hover:border-line hover:bg-surfaceHov transition-colors">
       <div className="flex items-center gap-3 px-2 py-2.5">
+        {/* Complete / undo button */}
         <button
           onClick={completed ? onUndo : onComplete}
           aria-label={completed ? "Undo completion" : "Mark done"}
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
-            completed ? "border-accent bg-accent text-paper" : "border-muted/60 text-transparent hover:border-accent"
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all ${
+            completed
+              ? "border-gradB bg-grad text-paper"
+              : "border-line text-transparent hover:border-gradA"
           }`}
         >
           <CheckIcon />
@@ -314,25 +309,25 @@ function TaskRow({
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
-            className="flex-1 bg-transparent font-body text-[15px] text-ink focus:outline-none"
+            className="flex-1 bg-transparent font-body text-[15px] text-bright focus:outline-none"
             maxLength={200}
           />
         ) : (
           <button
             onClick={() => setExpanded((x) => !x)}
-            className={`flex-1 text-left font-body text-[15px] ${
-              completed ? "text-muted line-through decoration-muted/60" : "text-ink"
+            className={`flex-1 text-left font-body text-[15px] transition-colors ${
+              completed ? "text-muted line-through decoration-muted/60" : "text-bright"
             }`}
           >
             {task.title}
           </button>
         )}
 
-        {/* Metadata badges */}
+        {/* Badges */}
         <div className="flex shrink-0 items-center gap-2">
           {dueLabel && !editing && (
             <span className={`font-mono text-[10px] uppercase tracking-wide ${
-              isOverdue ? "text-warn" : "text-muted"
+              isOverdue ? "text-warn" : "text-soft"
             }`}>
               {dueLabel}
             </span>
@@ -349,37 +344,39 @@ function TaskRow({
           )}
         </div>
 
-        {/* Action buttons */}
+        {/* Actions */}
         {editing ? (
           <div className="flex gap-2">
-            <button onClick={commitEdit} className="font-mono text-xs text-accent">Save</button>
+            <button onClick={commitEdit} className="font-mono text-xs grad-text">Save</button>
             <button onClick={cancelEdit} className="font-mono text-xs text-muted">Cancel</button>
           </div>
         ) : (
           <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
             <button onClick={startEdit} aria-label="Edit task"
-              className="font-mono text-xs text-muted hover:text-ink">✎</button>
+              className="font-mono text-xs text-muted hover:text-soft">✎</button>
             <button onClick={onDelete} aria-label="Delete task"
               className="font-mono text-xs text-muted hover:text-warn">×</button>
           </div>
         )}
       </div>
 
-      {/* Edit panel: recurrence + due date */}
+      {/* Edit panel */}
       {editing && (
         <div className="flex flex-wrap gap-2 px-10 pb-3">
           <div className="flex gap-1">
             {RECURRENCE_OPTIONS.map((opt) => (
               <button type="button" key={opt} onClick={() => setEditRecurrence(opt)}
                 className={`rounded-sm px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide transition-colors ${
-                  editRecurrence === opt ? "bg-accent text-paper" : "bg-accentSoft text-accent"
+                  editRecurrence === opt
+                    ? "bg-grad text-paper"
+                    : "bg-surface text-soft border border-line hover:border-gradA"
                 }`}>
                 {RECURRENCE_LABELS[opt]}
               </button>
             ))}
           </div>
           <input type="date" value={editDue} onChange={(e) => setEditDue(e.target.value)}
-            className="rounded-sm border border-line bg-transparent px-2 py-0.5 font-mono text-[10px] text-muted focus:border-accent focus:text-ink focus:outline-none"
+            className="rounded-sm border border-line bg-surface px-2 py-0.5 font-mono text-[10px] text-muted focus:border-gradA focus:text-bright focus:outline-none"
           />
           {editDue && (
             <button type="button" onClick={() => setEditDue("")}
@@ -392,7 +389,7 @@ function TaskRow({
       {expanded && !editing && (
         <div className="px-10 pb-3">
           {task.subtasks.length > 0 && (
-            <ul className="mb-2 flex flex-col gap-1">
+            <ul className="mb-2 flex flex-col gap-1.5">
               {task.subtasks.map((s) => (
                 <SubtaskRow key={s.id} subtask={s}
                   onToggle={(c) => onToggleSubtask(s.id, c)}
@@ -406,19 +403,19 @@ function TaskRow({
               value={subtaskInput}
               onChange={(e) => setSubtaskInput(e.target.value)}
               placeholder="Add subtask…"
-              className="flex-1 border-b border-line bg-transparent font-body text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+              className="flex-1 border-b border-line bg-transparent font-body text-xs text-bright placeholder:text-muted focus:border-gradA focus:outline-none transition-colors"
               maxLength={200}
             />
             <button type="submit" disabled={!subtaskInput.trim()}
-              className="font-mono text-[10px] uppercase tracking-wide text-accent disabled:text-muted">
+              className="font-mono text-[10px] uppercase tracking-wide grad-text disabled:text-muted disabled:[background:none] disabled:[-webkit-text-fill-color:#5A5A72]">
               Add
             </button>
           </form>
         </div>
       )}
 
-      {/* Expand toggle (only if not editing) */}
-      {!editing && (hasSubtasks || true) && (
+      {/* Expand chevron */}
+      {!editing && (
         <button
           onClick={() => setExpanded((x) => !x)}
           className="flex w-full items-center justify-center pb-1 opacity-0 transition-opacity group-hover:opacity-100"
@@ -430,8 +427,6 @@ function TaskRow({
     </li>
   );
 }
-
-// ─── SubtaskRow ───────────────────────────────────────────────────────────────
 
 function SubtaskRow({
   subtask, onToggle, onDelete,
@@ -445,14 +440,16 @@ function SubtaskRow({
       <button
         onClick={() => onToggle(!subtask.completed)}
         aria-label={subtask.completed ? "Mark not done" : "Mark done"}
-        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-          subtask.completed ? "border-accent bg-accent text-paper" : "border-muted/40 text-transparent hover:border-accent"
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all ${
+          subtask.completed
+            ? "border-gradB bg-grad text-paper"
+            : "border-line text-transparent hover:border-gradA"
         }`}
       >
         <CheckIcon size={7} />
       </button>
       <span className={`flex-1 font-body text-xs ${
-        subtask.completed ? "text-muted line-through" : "text-ink"
+        subtask.completed ? "text-muted line-through" : "text-soft"
       }`}>
         {subtask.title}
       </span>
@@ -463,8 +460,6 @@ function SubtaskRow({
     </li>
   );
 }
-
-// ─── Shared small components ──────────────────────────────────────────────────
 
 function CheckIcon({ size = 10 }: { size?: number }) {
   return (
@@ -479,7 +474,7 @@ function SectionLabel({ children, count }: { children: React.ReactNode; count: n
   return (
     <h2 className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted">
       {children}
-      <span className="text-muted/60">{count}</span>
+      <span className="text-muted/50">{count}</span>
     </h2>
   );
 }
