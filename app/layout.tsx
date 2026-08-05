@@ -49,7 +49,7 @@ export default function RootLayout({
         <div className="relative z-10 mx-auto flex min-h-screen max-w-xl flex-col px-6 pb-16 pt-10 sm:px-8">
           <header className="mb-10 flex items-baseline justify-between">
             <Link href="/" className="font-display text-2xl italic grad-text select-none">
-              Do.
+              Kamla.
             </Link>
             <nav className="flex gap-5 font-mono text-xs uppercase tracking-wider text-muted">
               <Link href="/" className="transition-colors hover:text-soft">
