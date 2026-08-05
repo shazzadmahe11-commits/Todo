@@ -34,19 +34,28 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body
-        className={`${display.variable} ${body.variable} ${mono.variable} font-body antialiased`}
-      >
-        <div className="mx-auto flex min-h-screen max-w-xl flex-col px-6 pb-16 pt-10 sm:px-8">
+      <body className={`${display.variable} ${body.variable} ${mono.variable} font-body antialiased bg-paper text-bright`}>
+
+        {/* Ambient gradient glow — the signature element */}
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 40% at 20% -10%, rgba(124,111,205,0.18) 0%, transparent 70%), radial-gradient(ellipse 50% 35% at 85% 110%, rgba(74,191,191,0.14) 0%, transparent 70%)",
+          }}
+        />
+
+        <div className="relative z-10 mx-auto flex min-h-screen max-w-xl flex-col px-6 pb-16 pt-10 sm:px-8">
           <header className="mb-10 flex items-baseline justify-between">
-            <Link href="/" className="font-display text-2xl italic text-ink">
+            <Link href="/" className="font-display text-2xl italic grad-text select-none">
               Do.
             </Link>
             <nav className="flex gap-5 font-mono text-xs uppercase tracking-wider text-muted">
-              <Link href="/" className="hover:text-ink">
+              <Link href="/" className="transition-colors hover:text-soft">
                 Today
               </Link>
-              <Link href="/calendar" className="hover:text-ink">
+              <Link href="/calendar" className="transition-colors hover:text-soft">
                 History
               </Link>
             </nav>
