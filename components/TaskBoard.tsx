@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Task,
-  Recurrence,
-  RECURRENCE_LABELS,
-  isPending,
-  todayStr,
+  Task, Subtask, Recurrence,
+  RECURRENCE_LABELS, isPending, todayStr, dueSoonLabel,
 } from "@/lib/recurrence";
 
 const RECURRENCE_OPTIONS: Recurrence[] = ["none", "daily", "weekly", "monthly"];
@@ -17,6 +14,7 @@ export default function TaskBoard() {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [recurrence, setRecurrence] = useState<Recurrence>("none");
+  const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function loadTasks() {
@@ -34,9 +32,7 @@ export default function TaskBoard() {
     }
   }
 
-  useEffect(() => {
-    loadTasks();
-  }, []);
+  useEffect(() => { loadTasks(); }, []);
 
   const { pending, done } = useMemo(() => {
     const now = new Date();
@@ -45,6 +41,12 @@ export default function TaskBoard() {
     for (const t of tasks) {
       (isPending(t, now) ? pending : done).push(t);
     }
+    // sort pending: overdue first, then by due date, then by created_at
+    pending.sort((a, b) => {
+      const da = a.due_date ?? "9999-99-99";
+      const db = b.due_date ?? "9999-99-99";
+      return da < db ? -1 : da > db ? 1 : 0;
+    });
     return { pending, done };
   }, [tasks]);
 
@@ -58,11 +60,10 @@ export default function TaskBoard() {
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: trimmed, recurrence }),
+        body: JSON.stringify({ title: trimmed, recurrence, due_date: dueDate || null }),
       });
       if (!res.ok) throw new Error("Could not add that task.");
-      setTitle("");
-      setRecurrence("none");
+      setTitle(""); setRecurrence("none"); setDueDate("");
       await loadTasks();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -72,50 +73,83 @@ export default function TaskBoard() {
   }
 
   async function completeTask(id: string) {
-    // optimistic update
     const today = todayStr();
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, last_completed_on: today } : t))
-    );
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, last_completed_on: today } : t));
     try {
       const res = await fetch(`/api/tasks/${id}/complete`, { method: "POST" });
-      if (!res.ok) throw new Error("Could not mark that complete.");
+      if (!res.ok) throw new Error();
       await loadTasks();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
-      await loadTasks();
-    }
+    } catch { setError("Could not mark complete."); await loadTasks(); }
   }
 
   async function undoComplete(id: string) {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, last_completed_on: null } : t))
-    );
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, last_completed_on: null } : t));
     try {
-      const res = await fetch(`/api/tasks/${id}/complete`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Could not undo that.");
+      const res = await fetch(`/api/tasks/${id}/complete`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       await loadTasks();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
-      await loadTasks();
-    }
+    } catch { setError("Could not undo."); await loadTasks(); }
   }
 
   async function deleteTask(id: string) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     try {
-      const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Could not delete that task.");
+      await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+    } catch { await loadTasks(); }
+  }
+
+  async function saveTaskEdit(id: string, updates: { title?: string; recurrence?: Recurrence; due_date?: string | null }) {
+    setError(null);
+    try {
+      const res = await fetch(`/api/tasks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error("Could not save changes.");
+      await loadTasks();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
-      await loadTasks();
     }
+  }
+
+  async function addSubtask(taskId: string, title: string) {
+    const res = await fetch(`/api/tasks/${taskId}/subtasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    if (!res.ok) throw new Error("Could not add subtask.");
+    await loadTasks();
+  }
+
+  async function toggleSubtask(subtaskId: string, completed: boolean) {
+    setTasks((prev) => prev.map((t) => ({
+      ...t,
+      subtasks: t.subtasks.map((s) => s.id === subtaskId ? { ...s, completed } : s),
+    })));
+    try {
+      await fetch(`/api/subtasks/${subtaskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed }),
+      });
+    } catch { await loadTasks(); }
+  }
+
+  async function deleteSubtask(subtaskId: string) {
+    setTasks((prev) => prev.map((t) => ({
+      ...t,
+      subtasks: t.subtasks.filter((s) => s.id !== subtaskId),
+    })));
+    try {
+      await fetch(`/api/subtasks/${subtaskId}`, { method: "DELETE" });
+    } catch { await loadTasks(); }
   }
 
   return (
     <div>
+      {/* Add task form */}
       <form onSubmit={addTask} className="mb-10 flex flex-col gap-3">
         <div className="flex gap-2 border-b border-line pb-2 focus-within:border-ink">
           <input
@@ -133,27 +167,28 @@ export default function TaskBoard() {
             Add
           </button>
         </div>
-        <div className="flex gap-1.5">
-          {RECURRENCE_OPTIONS.map((opt) => (
-            <button
-              type="button"
-              key={opt}
-              onClick={() => setRecurrence(opt)}
-              className={`rounded-sm px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide transition-colors ${
-                recurrence === opt
-                  ? "bg-accent text-paper"
-                  : "bg-accentSoft text-accent hover:bg-accent/20"
-              }`}
-            >
-              {RECURRENCE_LABELS[opt]}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1.5">
+            {RECURRENCE_OPTIONS.map((opt) => (
+              <button type="button" key={opt} onClick={() => setRecurrence(opt)}
+                className={`rounded-sm px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide transition-colors ${
+                  recurrence === opt ? "bg-accent text-paper" : "bg-accentSoft text-accent hover:bg-accent/20"
+                }`}>
+                {RECURRENCE_LABELS[opt]}
+              </button>
+            ))}
+          </div>
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="ml-auto rounded-sm border border-line bg-transparent px-2 py-1 font-mono text-[11px] text-muted focus:border-accent focus:text-ink focus:outline-none"
+            title="Due date (optional)"
+          />
         </div>
       </form>
 
-      {error && (
-        <p className="mb-6 font-mono text-xs text-warn">{error}</p>
-      )}
+      {error && <p className="mb-6 font-mono text-xs text-warn">{error}</p>}
 
       {loading ? (
         <p className="font-mono text-xs text-muted">Loading…</p>
@@ -166,11 +201,13 @@ export default function TaskBoard() {
             ) : (
               <ul className="flex flex-col gap-1">
                 {pending.map((t) => (
-                  <TaskRow
-                    key={t.id}
-                    task={t}
+                  <TaskRow key={t.id} task={t}
                     onComplete={() => completeTask(t.id)}
                     onDelete={() => deleteTask(t.id)}
+                    onSave={(u) => saveTaskEdit(t.id, u)}
+                    onAddSubtask={(title) => addSubtask(t.id, title)}
+                    onToggleSubtask={toggleSubtask}
+                    onDeleteSubtask={deleteSubtask}
                   />
                 ))}
               </ul>
@@ -182,12 +219,13 @@ export default function TaskBoard() {
               <SectionLabel count={done.length}>Done for now</SectionLabel>
               <ul className="flex flex-col gap-1">
                 {done.map((t) => (
-                  <TaskRow
-                    key={t.id}
-                    task={t}
-                    completed
+                  <TaskRow key={t.id} task={t} completed
                     onUndo={() => undoComplete(t.id)}
                     onDelete={() => deleteTask(t.id)}
+                    onSave={(u) => saveTaskEdit(t.id, u)}
+                    onAddSubtask={(title) => addSubtask(t.id, title)}
+                    onToggleSubtask={toggleSubtask}
+                    onDeleteSubtask={deleteSubtask}
                   />
                 ))}
               </ul>
@@ -199,13 +237,245 @@ export default function TaskBoard() {
   );
 }
 
-function SectionLabel({
-  children,
-  count,
+// ─── TaskRow ─────────────────────────────────────────────────────────────────
+
+function TaskRow({
+  task, completed = false,
+  onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask,
 }: {
-  children: React.ReactNode;
-  count: number;
+  task: Task; completed?: boolean;
+  onComplete?: () => void; onUndo?: () => void; onDelete: () => void;
+  onSave: (u: { title?: string; recurrence?: Recurrence; due_date?: string | null }) => void;
+  onAddSubtask: (title: string) => void;
+  onToggleSubtask: (id: string, completed: boolean) => void;
+  onDeleteSubtask: (id: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
+  const [editRecurrence, setEditRecurrence] = useState<Recurrence>(task.recurrence);
+  const [editDue, setEditDue] = useState(task.due_date ?? "");
+  const [subtaskInput, setSubtaskInput] = useState("");
+  const editRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (editing) editRef.current?.focus(); }, [editing]);
+
+  function startEdit() {
+    setEditTitle(task.title);
+    setEditRecurrence(task.recurrence);
+    setEditDue(task.due_date ?? "");
+    setEditing(true);
+    setExpanded(true);
+  }
+
+  function cancelEdit() { setEditing(false); }
+
+  function commitEdit() {
+    const trimmed = editTitle.trim();
+    if (!trimmed) return;
+    onSave({
+      title: trimmed,
+      recurrence: editRecurrence,
+      due_date: editDue || null,
+    });
+    setEditing(false);
+  }
+
+  function handleSubtaskAdd(e: React.FormEvent) {
+    e.preventDefault();
+    const t = subtaskInput.trim();
+    if (!t) return;
+    setSubtaskInput("");
+    onAddSubtask(t);
+  }
+
+  const dueLabel = dueSoonLabel(task.due_date);
+  const isOverdue = dueLabel === "Overdue";
+  const hasSubtasks = task.subtasks.length > 0;
+  const doneSubtasks = task.subtasks.filter((s) => s.completed).length;
+
+  return (
+    <li className="group rounded border border-transparent hover:border-line hover:bg-accentSoft/30">
+      {/* Main row */}
+      <div className="flex items-center gap-3 px-2 py-2.5">
+        <button
+          onClick={completed ? onUndo : onComplete}
+          aria-label={completed ? "Undo completion" : "Mark done"}
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
+            completed ? "border-accent bg-accent text-paper" : "border-muted/60 text-transparent hover:border-accent"
+          }`}
+        >
+          <CheckIcon />
+        </button>
+
+        {editing ? (
+          <input
+            ref={editRef}
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
+            className="flex-1 bg-transparent font-body text-[15px] text-ink focus:outline-none"
+            maxLength={200}
+          />
+        ) : (
+          <button
+            onClick={() => setExpanded((x) => !x)}
+            className={`flex-1 text-left font-body text-[15px] ${
+              completed ? "text-muted line-through decoration-muted/60" : "text-ink"
+            }`}
+          >
+            {task.title}
+          </button>
+        )}
+
+        {/* Metadata badges */}
+        <div className="flex shrink-0 items-center gap-2">
+          {dueLabel && !editing && (
+            <span className={`font-mono text-[10px] uppercase tracking-wide ${
+              isOverdue ? "text-warn" : "text-muted"
+            }`}>
+              {dueLabel}
+            </span>
+          )}
+          {task.recurrence !== "none" && !editing && (
+            <span className="font-mono text-[10px] uppercase tracking-wide text-muted">
+              {RECURRENCE_LABELS[task.recurrence]}
+            </span>
+          )}
+          {hasSubtasks && !editing && (
+            <span className="font-mono text-[10px] text-muted">
+              {doneSubtasks}/{task.subtasks.length}
+            </span>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        {editing ? (
+          <div className="flex gap-2">
+            <button onClick={commitEdit} className="font-mono text-xs text-accent">Save</button>
+            <button onClick={cancelEdit} className="font-mono text-xs text-muted">Cancel</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+            <button onClick={startEdit} aria-label="Edit task"
+              className="font-mono text-xs text-muted hover:text-ink">✎</button>
+            <button onClick={onDelete} aria-label="Delete task"
+              className="font-mono text-xs text-muted hover:text-warn">×</button>
+          </div>
+        )}
+      </div>
+
+      {/* Edit panel: recurrence + due date */}
+      {editing && (
+        <div className="flex flex-wrap gap-2 px-10 pb-3">
+          <div className="flex gap-1">
+            {RECURRENCE_OPTIONS.map((opt) => (
+              <button type="button" key={opt} onClick={() => setEditRecurrence(opt)}
+                className={`rounded-sm px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide transition-colors ${
+                  editRecurrence === opt ? "bg-accent text-paper" : "bg-accentSoft text-accent"
+                }`}>
+                {RECURRENCE_LABELS[opt]}
+              </button>
+            ))}
+          </div>
+          <input type="date" value={editDue} onChange={(e) => setEditDue(e.target.value)}
+            className="rounded-sm border border-line bg-transparent px-2 py-0.5 font-mono text-[10px] text-muted focus:border-accent focus:text-ink focus:outline-none"
+          />
+          {editDue && (
+            <button type="button" onClick={() => setEditDue("")}
+              className="font-mono text-[10px] text-muted hover:text-warn">Clear date</button>
+          )}
+        </div>
+      )}
+
+      {/* Subtasks panel */}
+      {expanded && !editing && (
+        <div className="px-10 pb-3">
+          {task.subtasks.length > 0 && (
+            <ul className="mb-2 flex flex-col gap-1">
+              {task.subtasks.map((s) => (
+                <SubtaskRow key={s.id} subtask={s}
+                  onToggle={(c) => onToggleSubtask(s.id, c)}
+                  onDelete={() => onDeleteSubtask(s.id)}
+                />
+              ))}
+            </ul>
+          )}
+          <form onSubmit={handleSubtaskAdd} className="flex gap-2">
+            <input
+              value={subtaskInput}
+              onChange={(e) => setSubtaskInput(e.target.value)}
+              placeholder="Add subtask…"
+              className="flex-1 border-b border-line bg-transparent font-body text-xs text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+              maxLength={200}
+            />
+            <button type="submit" disabled={!subtaskInput.trim()}
+              className="font-mono text-[10px] uppercase tracking-wide text-accent disabled:text-muted">
+              Add
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Expand toggle (only if not editing) */}
+      {!editing && (hasSubtasks || true) && (
+        <button
+          onClick={() => setExpanded((x) => !x)}
+          className="flex w-full items-center justify-center pb-1 opacity-0 transition-opacity group-hover:opacity-100"
+          aria-label={expanded ? "Collapse" : "Expand"}
+        >
+          <span className="font-mono text-[9px] text-muted">{expanded ? "▲" : "▼"}</span>
+        </button>
+      )}
+    </li>
+  );
+}
+
+// ─── SubtaskRow ───────────────────────────────────────────────────────────────
+
+function SubtaskRow({
+  subtask, onToggle, onDelete,
+}: {
+  subtask: Subtask;
+  onToggle: (completed: boolean) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <li className="group/sub flex items-center gap-2">
+      <button
+        onClick={() => onToggle(!subtask.completed)}
+        aria-label={subtask.completed ? "Mark not done" : "Mark done"}
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+          subtask.completed ? "border-accent bg-accent text-paper" : "border-muted/40 text-transparent hover:border-accent"
+        }`}
+      >
+        <CheckIcon size={7} />
+      </button>
+      <span className={`flex-1 font-body text-xs ${
+        subtask.completed ? "text-muted line-through" : "text-ink"
+      }`}>
+        {subtask.title}
+      </span>
+      <button onClick={onDelete} aria-label="Delete subtask"
+        className="font-mono text-xs text-muted opacity-0 hover:text-warn group-hover/sub:opacity-100">
+        ×
+      </button>
+    </li>
+  );
+}
+
+// ─── Shared small components ──────────────────────────────────────────────────
+
+function CheckIcon({ size = 10 }: { size?: number }) {
+  return (
+    <svg width={size} height={size * 0.8} viewBox="0 0 10 8" fill="none">
+      <path d="M1 4L3.5 6.5L9 1" stroke="currentColor" strokeWidth="1.6"
+        strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SectionLabel({ children, count }: { children: React.ReactNode; count: number }) {
   return (
     <h2 className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-muted">
       {children}
@@ -219,65 +489,5 @@ function EmptyState({ children }: { children: React.ReactNode }) {
     <p className="rounded border border-dashed border-line px-4 py-6 text-center font-body text-sm text-muted">
       {children}
     </p>
-  );
-}
-
-function TaskRow({
-  task,
-  completed = false,
-  onComplete,
-  onUndo,
-  onDelete,
-}: {
-  task: Task;
-  completed?: boolean;
-  onComplete?: () => void;
-  onUndo?: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <li className="group flex items-center gap-3 rounded px-1 py-2.5 hover:bg-accentSoft/50">
-      <button
-        onClick={completed ? onUndo : onComplete}
-        aria-label={completed ? "Mark not done" : "Mark done"}
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors ${
-          completed
-            ? "border-accent bg-accent text-paper"
-            : "border-muted/60 text-transparent hover:border-accent"
-        }`}
-      >
-        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-          <path
-            d="M1 4L3.5 6.5L9 1"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-
-      <span
-        className={`flex-1 font-body text-[15px] ${
-          completed ? "text-muted line-through decoration-muted/60" : "text-ink"
-        }`}
-      >
-        {task.title}
-      </span>
-
-      {task.recurrence !== "none" && (
-        <span className="font-mono text-[10px] uppercase tracking-wide text-muted">
-          {RECURRENCE_LABELS[task.recurrence]}
-        </span>
-      )}
-
-      <button
-        onClick={onDelete}
-        aria-label="Delete task"
-        className="ml-1 shrink-0 font-mono text-xs text-muted opacity-0 transition-opacity hover:text-warn group-hover:opacity-100"
-      >
-        ×
-      </button>
-    </li>
   );
 }
