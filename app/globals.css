@@ -3,32 +3,40 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 body {
-  background-color: #fafaf8;
-  color: #1a1a18;
+  background-color: #0E0E12;
+  color: #E8E8F0;
 }
 
-* {
-  -webkit-tap-highlight-color: transparent;
+/* Gradient text utility */
+.grad-text {
+  background: linear-gradient(90deg, #7C6FCD 0%, #4ABFBF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0E0E12; }
+::-webkit-scrollbar-thumb { background: #2A2A35; border-radius: 3px; }
+
+* { -webkit-tap-highlight-color: transparent; }
 
 ::selection {
-  background-color: #e7ece8;
+  background-color: rgba(124, 111, 205, 0.3);
 }
 
-/* visible keyboard focus everywhere */
 :focus-visible {
-  outline: 2px solid #3d5a47;
+  outline: 2px solid #7C6FCD;
   outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
