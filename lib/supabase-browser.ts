@@ -1,8 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
+import { Database } from "./database.types";
 
-// This client is safe to use in browser components.
-// It uses the anon key — RLS policies on each table enforce per-user access.
-let client: ReturnType<typeof createClient> | null = null;
+let client: ReturnType<typeof createClient<Database>> | null = null;
 
 export function getSupabaseBrowserClient() {
   if (client) return client;
@@ -13,6 +12,6 @@ export function getSupabaseBrowserClient() {
       "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY"
     );
   }
-  client = createClient(url, anon);
+  client = createClient<Database>(url, anon);
   return client;
 }
