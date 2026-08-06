@@ -10,6 +10,29 @@ import {
 
 const RECURRENCE_OPTIONS: Recurrence[] = ["none", "daily", "weekly", "monthly"];
 
+type TaskRow = {
+  id: string;
+  title: string;
+  recurrence: Recurrence;
+  archived: boolean;
+  due_date: string | null;
+  created_at: string;
+};
+
+type CompletionRow = {
+  task_id: string;
+  completed_on: string;
+};
+
+type SubtaskRow = {
+  id: string;
+  task_id: string;
+  title: string;
+  completed: boolean;
+  position: number;
+  created_at: string;
+};
+
 export default function TaskBoard() {
   const supabase = getSupabaseBrowserClient();
   const { user } = useAuth();
@@ -26,38 +49,41 @@ export default function TaskBoard() {
     setLoading(true);
     setError(null);
     try {
-      const { data: taskRows, error: taskErr } = await supabase
+      const { data: taskData, error: taskErr } = await supabase
         .from("tasks")
         .select("id, title, recurrence, archived, due_date, created_at")
         .eq("archived", false)
         .order("created_at", { ascending: true });
       if (taskErr) throw taskErr;
+      const taskRows = (taskData ?? []) as TaskRow[];
 
-      const { data: completionRows, error: compErr } = await supabase
+      const { data: completionData, error: compErr } = await supabase
         .from("completions")
         .select("task_id, completed_on")
         .order("completed_on", { ascending: false });
       if (compErr) throw compErr;
+      const completionRows = (completionData ?? []) as CompletionRow[];
 
-      const { data: subtaskRows, error: subErr } = await supabase
+      const { data: subtaskData, error: subErr } = await supabase
         .from("subtasks")
         .select("id, task_id, title, completed, position, created_at")
         .order("position", { ascending: true });
       if (subErr) throw subErr;
+      const subtaskRows = (subtaskData ?? []) as SubtaskRow[];
 
       const lastCompleted = new Map<string, string>();
-      for (const c of completionRows ?? []) {
+      for (const c of completionRows) {
         if (!lastCompleted.has(c.task_id)) lastCompleted.set(c.task_id, c.completed_on);
       }
 
       const subtasksByTask = new Map<string, Subtask[]>();
-      for (const s of subtaskRows ?? []) {
+      for (const s of subtaskRows) {
         const list = subtasksByTask.get(s.task_id) ?? [];
         list.push(s);
         subtasksByTask.set(s.task_id, list);
       }
 
-      const enriched: Task[] = (taskRows ?? []).map((t) => ({
+      const enriched: Task[] = taskRows.map((t) => ({
         ...t,
         last_completed_on: lastCompleted.get(t.id) ?? null,
         subtasks: subtasksByTask.get(t.id) ?? [],
@@ -133,7 +159,6 @@ export default function TaskBoard() {
     try {
       const today = todayStr();
       await supabase.from("completions").delete().eq("task_id", id).eq("completed_on", today);
-      // If one-off task was archived, bring it back
       await supabase.from("tasks").update({ archived: false }).eq("id", id).eq("recurrence", "none");
       await loadTasks();
     } catch (e: unknown) {
