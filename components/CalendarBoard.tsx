@@ -8,6 +8,13 @@ import { toDateStr } from "@/lib/recurrence";
 type DayEntry = { id: string; task_title: string };
 type DaysMap = Record<string, DayEntry[]>;
 
+type CompletionRow = {
+  id: string;
+  task_id: string;
+  task_title: string;
+  completed_on: string;
+};
+
 const MONTH_NAMES = ["January","February","March","April","May","June",
   "July","August","September","October","November","December"];
 const WEEKDAY_LABELS = ["M","T","W","T","F","S","S"];
@@ -41,7 +48,7 @@ export default function CalendarBoard() {
       .then(({ data }) => {
         if (cancelled) return;
         const byDay: DaysMap = {};
-        for (const row of data ?? []) {
+        for (const row of (data ?? []) as CompletionRow[]) {
           const list = byDay[row.completed_on] ?? [];
           list.push({ id: row.id, task_title: row.task_title });
           byDay[row.completed_on] = list;
