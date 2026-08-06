@@ -24,7 +24,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Do",
+  title: "Kamla.com",
   description: "A quiet place to keep track of what needs doing.",
 };
 
