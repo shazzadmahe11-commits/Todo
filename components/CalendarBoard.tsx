@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
+import { useAuth } from "@/context/AuthContext";
 import { toDateStr } from "@/lib/recurrence";
 
 type DayEntry = { id: string; task_title: string };
 type DaysMap = Record<string, DayEntry[]>;
 
-const MONTH_NAMES = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
-];
+const MONTH_NAMES = ["January","February","March","April","May","June",
+  "July","August","September","October","November","December"];
 const WEEKDAY_LABELS = ["M","T","W","T","F","S","S"];
 
 export default function CalendarBoard() {
+  const supabase = getSupabaseBrowserClient();
+  const { user } = useAuth();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -20,18 +22,36 @@ export default function CalendarBoard() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
 
-  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
-
   useEffect(() => {
+    if (!user) return;
     let cancelled = false;
     setLoading(true);
     setSelected(null);
-    fetch(`/api/completions?month=${monthKey}`, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => { if (!cancelled) setDays(data.days ?? {}); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+
+    const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const nextMonth = new Date(year, month + 1, 1);
+    const end = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}-01`;
+
+    supabase
+      .from("completions")
+      .select("id, task_id, task_title, completed_on")
+      .gte("completed_on", start)
+      .lt("completed_on", end)
+      .order("completed_on", { ascending: true })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const byDay: DaysMap = {};
+        for (const row of data ?? []) {
+          const list = byDay[row.completed_on] ?? [];
+          list.push({ id: row.id, task_title: row.task_title });
+          byDay[row.completed_on] = list;
+        }
+        setDays(byDay);
+        setLoading(false);
+      });
+
     return () => { cancelled = true; };
-  }, [monthKey]);
+  }, [user, year, month]);
 
   const cells = useMemo(() => {
     const first = new Date(year, month, 1);
@@ -47,7 +67,6 @@ export default function CalendarBoard() {
     if (month === 0) { setYear((y) => y - 1); setMonth(11); }
     else setMonth((m) => m - 1);
   }
-
   function goNext() {
     if (month === 11) { setYear((y) => y + 1); setMonth(0); }
     else setMonth((m) => m + 1);
@@ -70,9 +89,7 @@ export default function CalendarBoard() {
 
       <div className="mb-2 grid grid-cols-7 gap-1">
         {WEEKDAY_LABELS.map((w, i) => (
-          <div key={i} className="text-center font-mono text-[10px] uppercase tracking-wide text-muted">
-            {w}
-          </div>
+          <div key={i} className="text-center font-mono text-[10px] uppercase tracking-wide text-muted">{w}</div>
         ))}
       </div>
 
@@ -80,8 +97,7 @@ export default function CalendarBoard() {
         {cells.map((d, i) => {
           if (d === null) return <div key={i} />;
           const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-          const entries = days[dateKey];
-          const count = entries?.length ?? 0;
+          const count = days[dateKey]?.length ?? 0;
           const isToday = dateKey === todayKey;
           const isSelected = dateKey === selected;
 
@@ -90,13 +106,10 @@ export default function CalendarBoard() {
               onClick={() => setSelected(count > 0 ? dateKey : null)}
               disabled={count === 0}
               className={`relative flex aspect-square flex-col items-center justify-center rounded font-mono text-xs transition-all ${
-                isSelected
-                  ? "bg-grad text-paper shadow-lg"
-                  : count > 0
-                  ? "bg-surface text-soft border border-line hover:border-gradA hover:text-bright"
-                  : "text-muted/50"
-              } ${isToday && !isSelected ? "ring-1 ring-gradA/60" : ""}`}
-            >
+                isSelected ? "bg-grad text-paper shadow-lg"
+                : count > 0 ? "bg-surface text-soft border border-line hover:border-gradA hover:text-bright"
+                : "text-muted/50"
+              } ${isToday && !isSelected ? "ring-1 ring-gradA/60" : ""}`}>
               {d}
               {count > 0 && (
                 <span className={`mt-0.5 h-1 w-1 rounded-full ${isSelected ? "bg-paper/60" : "bg-gradB"}`} />
@@ -114,7 +127,7 @@ export default function CalendarBoard() {
           <ul className="flex flex-col gap-2">
             {selectedEntries.map((e) => (
               <li key={e.id} className="flex items-center gap-2 font-body text-[15px] text-bright">
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-grad" />
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gradB" />
                 {e.task_title}
               </li>
             ))}
