@@ -47,7 +47,7 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-sm">
         <h1 className="mb-8 text-center font-display text-3xl italic grad-text select-none">
-          Do.
+          Kamla.
         </h1>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
