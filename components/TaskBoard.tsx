@@ -108,6 +108,9 @@ export default function TaskBoard() {
     return { pending, done };
   }, [tasks]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = title.trim();
@@ -115,7 +118,7 @@ export default function TaskBoard() {
     setSubmitting(true);
     setError(null);
     try {
-      const { error } = await supabase.from("tasks").insert({
+      const { error } = await db.from("tasks").insert({
         title: trimmed,
         recurrence,
         due_date: dueDate || null,
@@ -137,7 +140,7 @@ export default function TaskBoard() {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, last_completed_on: today } : t));
     try {
       const task = tasks.find((t) => t.id === id);
-      const { error: compErr } = await supabase.from("completions").insert({
+      const { error: compErr } = await db.from("completions").insert({
         task_id: id,
         task_title: task?.title ?? "",
         completed_on: today,
@@ -145,7 +148,7 @@ export default function TaskBoard() {
       });
       if (compErr) throw compErr;
       if (task?.recurrence === "none") {
-        await supabase.from("tasks").update({ archived: true }).eq("id", id);
+        await db.from("tasks").update({ archived: true }).eq("id", id);
       }
       await loadTasks();
     } catch (e: unknown) {
@@ -158,8 +161,8 @@ export default function TaskBoard() {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, last_completed_on: null } : t));
     try {
       const today = todayStr();
-      await supabase.from("completions").delete().eq("task_id", id).eq("completed_on", today);
-      await supabase.from("tasks").update({ archived: false }).eq("id", id).eq("recurrence", "none");
+      await db.from("completions").delete().eq("task_id", id).eq("completed_on", today);
+      await db.from("tasks").update({ archived: false }).eq("id", id).eq("recurrence", "none");
       await loadTasks();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Could not undo.");
@@ -170,13 +173,13 @@ export default function TaskBoard() {
   async function deleteTask(id: string) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
     try {
-      await supabase.from("tasks").delete().eq("id", id);
+      await db.from("tasks").delete().eq("id", id);
     } catch { await loadTasks(); }
   }
 
   async function saveTaskEdit(id: string, updates: { title?: string; recurrence?: Recurrence; due_date?: string | null }) {
     try {
-      const { error } = await supabase.from("tasks").update(updates).eq("id", id);
+      const { error } = await db.from("tasks").update(updates).eq("id", id);
       if (error) throw error;
       await loadTasks();
     } catch (e: unknown) {
@@ -186,9 +189,8 @@ export default function TaskBoard() {
 
   async function addSubtask(taskId: string, subTitle: string) {
     if (!user) return;
-    const { count } = await supabase
-      .from("subtasks").select("id", { count: "exact", head: true }).eq("task_id", taskId);
-    const { error } = await supabase.from("subtasks").insert({
+    const { count } = await db.from("subtasks").select("id", { count: "exact", head: true }).eq("task_id", taskId);
+    const { error } = await db.from("subtasks").insert({
       task_id: taskId,
       title: subTitle,
       position: count ?? 0,
@@ -203,7 +205,7 @@ export default function TaskBoard() {
       ...t,
       subtasks: t.subtasks.map((s) => s.id === subtaskId ? { ...s, completed } : s),
     })));
-    await supabase.from("subtasks").update({ completed }).eq("id", subtaskId);
+    await db.from("subtasks").update({ completed }).eq("id", subtaskId);
   }
 
   async function deleteSubtask(subtaskId: string) {
@@ -211,7 +213,7 @@ export default function TaskBoard() {
       ...t,
       subtasks: t.subtasks.filter((s) => s.id !== subtaskId),
     })));
-    await supabase.from("subtasks").delete().eq("id", subtaskId);
+    await db.from("subtasks").delete().eq("id", subtaskId);
   }
 
   return (
