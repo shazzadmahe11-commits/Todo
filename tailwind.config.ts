@@ -2,21 +2,20 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        // Dark theme palette
-        paper:      "#0E0E12",   // near-black base
-        surface:    "#16161C",   // card/row surface
-        surfaceHov: "#1E1E26",   // hovered row
-        line:       "#2A2A35",   // borders
-        muted:      "#5A5A72",   // de-emphasised text
-        soft:       "#8888A8",   // secondary text
-        bright:     "#E8E8F0",   // primary text
-        // Gradient stops — purple → teal
-        gradA:      "#7C6FCD",   // violet
-        gradB:      "#4ABFBF",   // teal
-        // Status
+        // Dark theme
+        paper:      "#0E0E12",
+        surface:    "#16161C",
+        surfaceHov: "#1E1E26",
+        line:       "#2A2A35",
+        muted:      "#5A5A72",
+        soft:       "#8888A8",
+        bright:     "#E8E8F0",
+        gradA:      "#7C6FCD",
+        gradB:      "#4ABFBF",
         warn:       "#E07060",
         warnSoft:   "#3A1F1A",
       },
