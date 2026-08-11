@@ -2,16 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dark (default) ─────────────────────────────────────── */
 :root {
   color-scheme: dark;
+  --bg:          #0E0E12;
+  --surface:     #16161C;
+  --surface-hov: #1E1E26;
+  --line:        #2A2A35;
+  --muted:       #5A5A72;
+  --soft:        #8888A8;
+  --bright:      #E8E8F0;
+  --warn:        #E07060;
+  --glow-a: rgba(124,111,205,0.18);
+  --glow-b: rgba(74,191,191,0.14);
+}
+
+/* ── Light ───────────────────────────────────────────────── */
+:root.light {
+  color-scheme: light;
+  --bg:          #F7F7F4;
+  --surface:     #FFFFFF;
+  --surface-hov: #F0EFF8;
+  --line:        #E2E0EC;
+  --muted:       #9896B0;
+  --soft:        #5E5C78;
+  --bright:      #18171F;
+  --warn:        #C0442E;
+  --glow-a: rgba(124,111,205,0.10);
+  --glow-b: rgba(74,191,191,0.08);
 }
 
 body {
-  background-color: #0E0E12;
-  color: #E8E8F0;
+  background-color: var(--bg);
+  color: var(--bright);
+  transition: background-color 0.2s, color 0.2s;
 }
 
-/* Gradient text utility */
+/* Override Tailwind colour tokens with CSS vars so light/dark just works */
+.bg-paper      { background-color: var(--bg) !important; }
+.bg-surface    { background-color: var(--surface) !important; }
+.bg-surfaceHov { background-color: var(--surface-hov) !important; }
+.border-line   { border-color: var(--line) !important; }
+.text-muted    { color: var(--muted) !important; }
+.text-soft     { color: var(--soft) !important; }
+.text-bright   { color: var(--bright) !important; }
+.text-warn     { color: var(--warn) !important; }
+.hover\:text-warn:hover { color: var(--warn) !important; }
+.hover\:text-soft:hover { color: var(--soft) !important; }
+.hover\:text-bright:hover { color: var(--bright) !important; }
+.placeholder\:text-muted::placeholder { color: var(--muted) !important; }
+.focus\:text-bright:focus { color: var(--bright) !important; }
+.focus\:border-gradA:focus { border-color: #7C6FCD !important; }
+.hover\:border-gradA:hover { border-color: #7C6FCD !important; }
+.hover\:border-line:hover { border-color: var(--line) !important; }
+.hover\:bg-surfaceHov:hover { background-color: var(--surface-hov) !important; }
+.ring-gradA\/60 { --tw-ring-color: rgba(124,111,205,0.6) !important; }
+
+/* Gradient text */
 .grad-text {
   background: linear-gradient(90deg, #7C6FCD 0%, #4ABFBF 100%);
   -webkit-background-clip: text;
@@ -19,16 +66,13 @@ body {
   background-clip: text;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0E0E12; }
-::-webkit-scrollbar-thumb { background: #2A2A35; border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
 
 * { -webkit-tap-highlight-color: transparent; }
 
-::selection {
-  background-color: rgba(124, 111, 205, 0.3);
-}
+::selection { background-color: rgba(124,111,205,0.25); }
 
 :focus-visible {
   outline: 2px solid #7C6FCD;
@@ -38,7 +82,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
 }
