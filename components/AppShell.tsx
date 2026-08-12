@@ -97,7 +97,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Header */}
         <header className="mb-10 flex items-center justify-between">
           <Link href="/" className="font-display text-[26px] italic grad-text select-none leading-none">
-            Do.
+            Kamla.
           </Link>
 
           <div className="flex items-center gap-1">
