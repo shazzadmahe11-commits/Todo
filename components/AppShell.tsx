@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 
 function SunIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="4"/>
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
     </svg>
@@ -16,8 +16,18 @@ function SunIcon() {
 
 function MoonIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+  );
+}
+
+function SignOutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+      <polyline points="16 17 21 12 16 7"/>
+      <line x1="21" y1="12" x2="9" y2="12"/>
     </svg>
   );
 }
@@ -29,7 +39,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/login";
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
-  // Load saved theme on mount
   useEffect(() => {
     const saved = localStorage.getItem("theme") as "dark" | "light" | null;
     const preferred = saved ?? "dark";
@@ -38,11 +47,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   function applyTheme(t: "dark" | "light") {
-    if (t === "light") {
-      document.documentElement.classList.add("light");
-    } else {
-      document.documentElement.classList.remove("light");
-    }
+    if (t === "light") document.documentElement.classList.add("light");
+    else document.documentElement.classList.remove("light");
   }
 
   function toggleTheme() {
@@ -53,9 +59,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    if (!loading && !user && !isLoginPage) {
-      router.push("/login");
-    }
+    if (!loading && !user && !isLoginPage) router.push("/login");
   }, [user, loading, isLoginPage]);
 
   if (isLoginPage) return <>{children}</>;
@@ -66,41 +70,69 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     router.push("/login");
   }
 
+  const navLink = (href: string, label: string) => {
+    const active = pathname === href;
+    return (
+      <Link href={href}
+        className={`relative px-1 py-0.5 font-mono text-[11px] uppercase tracking-widest transition-colors ${
+          active ? "grad-text" : "text-muted hover:text-soft"
+        }`}>
+        {label}
+        {active && (
+          <span className="absolute -bottom-0.5 left-0 right-0 h-px bg-grad rounded-full" />
+        )}
+      </Link>
+    );
+  };
+
   return (
     <>
-      {/* Ambient gradient glow */}
+      {/* Ambient glow */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0"
-        style={{ background: "radial-gradient(ellipse 60% 40% at 20% -10%, var(--glow-a) 0%, transparent 70%), radial-gradient(ellipse 50% 35% at 85% 110%, var(--glow-b) 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(ellipse 55% 35% at 15% -5%, var(--glow-a) 0%, transparent 65%), radial-gradient(ellipse 45% 30% at 90% 105%, var(--glow-b) 0%, transparent 65%)" }}
       />
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-xl flex-col px-6 pb-16 pt-10 sm:px-8">
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-2xl flex-col px-5 pb-20 pt-8 sm:px-8">
+
+        {/* Header */}
         <header className="mb-10 flex items-center justify-between">
-          <Link href="/" className="font-display text-2xl italic grad-text select-none">
-            Kamla
+          <Link href="/" className="font-display text-[26px] italic grad-text select-none leading-none">
+            Do.
           </Link>
-          <nav className="flex items-center gap-4 font-mono text-xs uppercase tracking-wider text-muted">
-            <Link href="/" className="transition-colors hover:text-soft">Today</Link>
-            <Link href="/calendar" className="transition-colors hover:text-soft">History</Link>
+
+          <div className="flex items-center gap-1">
+            {/* Nav links */}
+            <div className="flex items-center gap-1 rounded-full border border-line px-3 py-1.5 mr-2" style={{ backgroundColor: "var(--surface)" }}>
+              {navLink("/", "Today")}
+              <span className="text-line mx-1">·</span>
+              {navLink("/calendar", "History")}
+            </div>
 
             {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-line transition-colors hover:border-gradA hover:text-soft"
-            >
+            <button onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Light mode" : "Dark mode"}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted transition-all hover:border-gradA hover:text-soft"
+              style={{ backgroundColor: "var(--surface)" }}>
               {theme === "dark" ? <SunIcon /> : <MoonIcon />}
             </button>
 
-            <button onClick={handleSignOut} className="transition-colors hover:text-warn">
-              Sign out
+            {/* Sign out */}
+            <button onClick={handleSignOut}
+              aria-label="Sign out"
+              title={`Sign out (${user.email})`}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted transition-all hover:border-warn hover:text-warn"
+              style={{ backgroundColor: "var(--surface)" }}>
+              <SignOutIcon />
             </button>
-          </nav>
+          </div>
         </header>
 
         <main className="flex-1">{children}</main>
 
-        <footer className="mt-10 text-right font-mono text-[10px] text-muted/40 truncate">
-          {user.email}
+        <footer className="mt-12 flex items-center justify-between">
+          <span className="font-mono text-[10px] text-muted/40">{user.email}</span>
+          <span className="font-mono text-[10px] text-muted/30">Do.</span>
         </footer>
       </div>
     </>
