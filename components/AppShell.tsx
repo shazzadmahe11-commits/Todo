@@ -53,7 +53,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const next2 = theme === "dark" ? "light" : "dark";
     let liveMeta = document.querySelector('meta[name="theme-color"][data-live]') as HTMLMetaElement | null;
     if (!liveMeta) { liveMeta = document.createElement("meta"); liveMeta.name = "theme-color"; liveMeta.setAttribute("data-live","1"); document.head.appendChild(liveMeta); }
-    liveMeta.content = next2 === "dark" ? "#0D0D18" : "#E8E0FF";
+    liveMeta.content = next2 === "dark" ? "#1a1030" : "#ddd4f8";
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next); applyTheme(next);
     localStorage.setItem("theme", next);
