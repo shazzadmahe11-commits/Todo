@@ -3,10 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useAuth } from "@/context/AuthContext";
-import {
-  Task, Subtask, Recurrence,
-  RECURRENCE_LABELS, isPending, todayStr, dueSoonLabel,
-} from "@/lib/recurrence";
+import { Task, Subtask, Recurrence, RECURRENCE_LABELS, isPending, todayStr, dueSoonLabel } from "@/lib/recurrence";
 
 const RECURRENCE_OPTIONS: Recurrence[] = ["none", "daily", "weekly", "monthly"];
 type TaskRowDB = { id: string; title: string; recurrence: Recurrence; archived: boolean; due_date: string | null; created_at: string; };
@@ -31,34 +28,25 @@ export default function TaskBoard() {
     if (!user) return;
     setLoading(true); setError(null);
     try {
-      const { data: taskData, error: taskErr } = await supabase.from("tasks").select("id,title,recurrence,archived,due_date,created_at").eq("archived", false).order("created_at", { ascending: true });
-      if (taskErr) throw taskErr;
-      const { data: compData, error: compErr } = await supabase.from("completions").select("task_id,completed_on").order("completed_on", { ascending: false });
-      if (compErr) throw compErr;
-      const { data: subData, error: subErr } = await supabase.from("subtasks").select("id,task_id,title,completed,position,created_at").order("position", { ascending: true });
-      if (subErr) throw subErr;
+      const { data: taskData, error: te } = await supabase.from("tasks").select("id,title,recurrence,archived,due_date,created_at").eq("archived", false).order("created_at", { ascending: true });
+      if (te) throw te;
+      const { data: compData, error: ce } = await supabase.from("completions").select("task_id,completed_on").order("completed_on", { ascending: false });
+      if (ce) throw ce;
+      const { data: subData, error: se } = await supabase.from("subtasks").select("id,task_id,title,completed,position,created_at").order("position", { ascending: true });
+      if (se) throw se;
       const lastCompleted = new Map<string, string>();
-      for (const c of (compData ?? []) as CompletionRowDB[]) {
-        if (!lastCompleted.has(c.task_id)) lastCompleted.set(c.task_id, c.completed_on);
-      }
+      for (const c of (compData ?? []) as CompletionRowDB[]) { if (!lastCompleted.has(c.task_id)) lastCompleted.set(c.task_id, c.completed_on); }
       const subtasksByTask = new Map<string, Subtask[]>();
-      for (const s of (subData ?? []) as SubtaskRowDB[]) {
-        const list = subtasksByTask.get(s.task_id) ?? [];
-        list.push(s); subtasksByTask.set(s.task_id, list);
-      }
-      setTasks(((taskData ?? []) as TaskRowDB[]).map(t => ({
-        ...t, last_completed_on: lastCompleted.get(t.id) ?? null, subtasks: subtasksByTask.get(t.id) ?? [],
-      })));
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Could not load tasks.");
-    } finally { setLoading(false); }
+      for (const s of (subData ?? []) as SubtaskRowDB[]) { const l = subtasksByTask.get(s.task_id) ?? []; l.push(s); subtasksByTask.set(s.task_id, l); }
+      setTasks(((taskData ?? []) as TaskRowDB[]).map(t => ({ ...t, last_completed_on: lastCompleted.get(t.id) ?? null, subtasks: subtasksByTask.get(t.id) ?? [] })));
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not load tasks."); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => { loadTasks(); }, [user]);
 
   const { pending, done } = useMemo(() => {
-    const now = new Date();
-    const pending: Task[] = [], done: Task[] = [];
+    const now = new Date(); const pending: Task[] = [], done: Task[] = [];
     for (const t of tasks) (isPending(t, now) ? pending : done).push(t);
     pending.sort((a, b) => (a.due_date ?? "9999") < (b.due_date ?? "9999") ? -1 : 1);
     return { pending, done };
@@ -74,8 +62,8 @@ export default function TaskBoard() {
       if (error) throw error;
       setTitle(""); setRecurrence("none"); setDueDate(""); setShowForm(false);
       await loadTasks();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not add task.");
-    } finally { setSubmitting(false); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not add task."); }
+    finally { setSubmitting(false); }
   }
 
   async function completeTask(id: string) {
@@ -106,10 +94,8 @@ export default function TaskBoard() {
   }
 
   async function saveTaskEdit(id: string, updates: { title?: string; recurrence?: Recurrence; due_date?: string | null }) {
-    try {
-      const { error } = await db.from("tasks").update(updates).eq("id", id);
-      if (error) throw error; await loadTasks();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not save."); }
+    try { const { error } = await db.from("tasks").update(updates).eq("id", id); if (error) throw error; await loadTasks(); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not save."); }
   }
 
   async function addSubtask(taskId: string, subTitle: string) {
@@ -130,50 +116,54 @@ export default function TaskBoard() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-
-      {/* Add task — collapsed trigger on mobile */}
+    <div className="flex flex-col gap-5">
+      {/* Add task trigger */}
       {!showForm ? (
         <button onClick={() => setShowForm(true)}
-          className="card flex items-center gap-3 px-4 py-3.5 w-full text-left hover:border-gradA transition-colors active:scale-[0.99]">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-grad text-paper text-lg leading-none font-light">+</span>
+          className="glass glass-hover w-full flex items-center gap-3 px-5 py-4 text-left active:scale-[0.99] transition-all"
+          style={{ boxShadow:"0 4px 24px rgba(0,0,0,0.10)" }}>
+          <span className="grad-btn flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white text-xl leading-none font-light">+</span>
           <span className="font-body text-[15px] text-muted">Add a task…</span>
         </button>
       ) : (
-        <div className="card p-4 sm:p-5">
-          <div className="mb-3 flex items-center justify-between">
+        <div className="glass p-5" style={{ boxShadow:"0 8px 32px rgba(0,0,0,0.12)" }}>
+          <div className="mb-4 flex items-center justify-between">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted">New task</p>
             <button onClick={() => { setShowForm(false); setTitle(""); setRecurrence("none"); setDueDate(""); }}
-              className="font-mono text-xs text-muted hover:text-soft">✕</button>
+              className="h-7 w-7 flex items-center justify-center rounded-full text-muted hover:text-soft transition-colors"
+              style={{ background:"var(--surface-2)" }}>
+              <span className="text-sm">✕</span>
+            </button>
           </div>
           <form onSubmit={addTask} className="flex flex-col gap-4">
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What needs doing?"
-              autoFocus
-              className="w-full bg-transparent font-body text-[15px] text-bright placeholder:text-muted focus:outline-none border-b border-line pb-2 focus:border-gradA transition-colors"
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What needs doing?" autoFocus
+              className="w-full bg-transparent font-body text-[16px] text-bright placeholder:text-muted focus:outline-none border-b pb-2 transition-colors"
+              style={{ borderColor:"var(--line)" }}
+              onFocus={e => e.currentTarget.style.borderColor = "#7C6FCD"}
+              onBlur={e => e.currentTarget.style.borderColor = "var(--line)"}
               maxLength={200} />
-
-            {/* Recurrence — scrollable row on mobile */}
-            <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
               {RECURRENCE_OPTIONS.map(opt => (
                 <button type="button" key={opt} onClick={() => setRecurrence(opt)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide transition-all ${
-                    recurrence === opt ? "bg-grad text-paper" : "border border-line text-muted"
-                  }`} style={recurrence !== opt ? { backgroundColor: "var(--surface-2)" } : {}}>
+                  className={`shrink-0 rounded-full px-4 py-1.5 font-mono text-[10px] uppercase tracking-wide transition-all active:scale-95 ${
+                    recurrence === opt ? "grad-btn text-white" : "text-muted hover:text-soft"
+                  }`}
+                  style={recurrence !== opt ? { background:"var(--surface-2)", border:"1px solid var(--line)" } : {}}>
                   {RECURRENCE_LABELS[opt]}
                 </button>
               ))}
             </div>
-
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <label className="font-mono text-[10px] uppercase tracking-wider text-muted shrink-0">Due</label>
                 <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                  className="rounded-lg border border-line px-2.5 py-1.5 font-mono text-[11px] text-muted focus:border-gradA focus:text-bright focus:outline-none transition-colors"
-                  style={{ backgroundColor: "var(--surface-2)" }} />
-                {dueDate && <button type="button" onClick={() => setDueDate("")} className="text-muted hover:text-warn text-sm">✕</button>}
+                  className="rounded-xl px-3 py-1.5 font-mono text-[11px] text-muted focus:outline-none transition-colors"
+                  style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
+                  onFocus={e => e.currentTarget.style.borderColor = "#7C6FCD"}
+                  onBlur={e => e.currentTarget.style.borderColor = "var(--line)"} />
+                {dueDate && <button type="button" onClick={() => setDueDate("")} className="text-muted hover:text-warn text-sm transition-colors">✕</button>}
               </div>
-              <button type="submit" disabled={!title.trim() || submitting}
-                className="shrink-0 rounded-full bg-grad px-5 py-2 font-mono text-[11px] uppercase tracking-wider text-paper disabled:opacity-40 transition-opacity active:scale-95">
+              <button type="submit" disabled={!title.trim() || submitting} className="grad-btn shrink-0 rounded-full px-6 py-2.5 font-mono text-[11px] uppercase tracking-wider text-white">
                 Add
               </button>
             </div>
@@ -182,76 +172,73 @@ export default function TaskBoard() {
       )}
 
       {error && (
-        <div className="rounded-xl border border-warn/30 px-4 py-3 font-mono text-xs text-warn" style={{ backgroundColor: "rgba(224,112,96,0.08)" }}>
+        <div className="rounded-2xl px-4 py-3 font-mono text-xs text-warn"
+          style={{ background:"var(--warn-bg)", border:"1px solid var(--warn-border)" }}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="flex gap-1.5">
+        <div className="flex items-center justify-center py-20">
+          <div className="flex gap-2">
             {[0,1,2].map(i => (
-              <div key={i} className="h-1.5 w-1.5 rounded-full bg-gradA animate-pulse" style={{ animationDelay: `${i * 150}ms` }} />
+              <div key={i} className="h-2 w-2 rounded-full pulse-dot"
+                style={{ background:"linear-gradient(135deg,#7C6FCD,#4ABFBF)", animationDelay:`${i*200}ms` }} />
             ))}
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
-          <section>
-            <div className="mb-3 flex items-center gap-2.5">
-              <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted">To do</h2>
-              {pending.length > 0 && (
-                <span className="rounded-full px-2 py-0.5 font-mono text-[10px] text-soft border border-line" style={{ backgroundColor: "var(--surface-2)" }}>
-                  {pending.length}
-                </span>
-              )}
-            </div>
+        <div className="flex flex-col gap-5">
+          <Section label="To do" count={pending.length}>
             {pending.length === 0 ? (
-              <div className="card flex flex-col items-center gap-2 py-12 text-center">
-                <div className="text-3xl">✓</div>
+              <div className="glass flex flex-col items-center gap-3 py-14 text-center">
+                <div className="grad-btn flex h-12 w-12 items-center justify-center rounded-full text-2xl text-white">✓</div>
                 <p className="font-body text-sm text-muted">All clear. Nothing left to do.</p>
               </div>
             ) : (
-              <div className="card overflow-hidden">
+              <div className="glass overflow-hidden" style={{ boxShadow:"0 4px 24px rgba(0,0,0,0.10)" }}>
                 {pending.map((t, i) => (
                   <TaskItem key={t.id} task={t} isLast={i === pending.length - 1}
-                    onComplete={() => completeTask(t.id)}
-                    onDelete={() => deleteTask(t.id)}
-                    onSave={u => saveTaskEdit(t.id, u)}
-                    onAddSubtask={st => addSubtask(t.id, st)}
-                    onToggleSubtask={toggleSubtask}
-                    onDeleteSubtask={deleteSubtask}
-                  />
+                    onComplete={() => completeTask(t.id)} onDelete={() => deleteTask(t.id)}
+                    onSave={u => saveTaskEdit(t.id, u)} onAddSubtask={st => addSubtask(t.id, st)}
+                    onToggleSubtask={toggleSubtask} onDeleteSubtask={deleteSubtask} />
                 ))}
               </div>
             )}
-          </section>
+          </Section>
 
           {done.length > 0 && (
-            <section>
-              <div className="mb-3 flex items-center gap-2.5">
-                <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted">Done</h2>
-                <span className="rounded-full px-2 py-0.5 font-mono text-[10px] text-soft border border-line" style={{ backgroundColor: "var(--surface-2)" }}>
-                  {done.length}
-                </span>
-              </div>
-              <div className="card overflow-hidden opacity-75">
+            <Section label="Done" count={done.length}>
+              <div className="glass overflow-hidden" style={{ boxShadow:"0 4px 24px rgba(0,0,0,0.08)", opacity:0.8 }}>
                 {done.map((t, i) => (
                   <TaskItem key={t.id} task={t} completed isLast={i === done.length - 1}
-                    onUndo={() => undoComplete(t.id)}
-                    onDelete={() => deleteTask(t.id)}
-                    onSave={u => saveTaskEdit(t.id, u)}
-                    onAddSubtask={st => addSubtask(t.id, st)}
-                    onToggleSubtask={toggleSubtask}
-                    onDeleteSubtask={deleteSubtask}
-                  />
+                    onUndo={() => undoComplete(t.id)} onDelete={() => deleteTask(t.id)}
+                    onSave={u => saveTaskEdit(t.id, u)} onAddSubtask={st => addSubtask(t.id, st)}
+                    onToggleSubtask={toggleSubtask} onDeleteSubtask={deleteSubtask} />
                 ))}
               </div>
-            </section>
+            </Section>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+function Section({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center gap-2.5 px-1">
+        <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted">{label}</h2>
+        {count > 0 && (
+          <span className="rounded-full px-2 py-0.5 font-mono text-[10px] text-muted"
+            style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
+            {count}
+          </span>
+        )}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -266,36 +253,35 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
-  const [editRecurrence, setEditRecurrence] = useState<Recurrence>(task.recurrence);
+  const [editRec, setEditRec] = useState<Recurrence>(task.recurrence);
   const [editDue, setEditDue] = useState(task.due_date ?? "");
-  const [subtaskInput, setSubtaskInput] = useState("");
+  const [subInput, setSubInput] = useState("");
   const editRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editing) editRef.current?.focus(); }, [editing]);
 
-  function startEdit() { setEditTitle(task.title); setEditRecurrence(task.recurrence); setEditDue(task.due_date ?? ""); setEditing(true); setExpanded(true); }
+  function startEdit() { setEditTitle(task.title); setEditRec(task.recurrence); setEditDue(task.due_date ?? ""); setEditing(true); setExpanded(true); }
   function cancelEdit() { setEditing(false); }
-  function commitEdit() { const t = editTitle.trim(); if (!t) return; onSave({ title: t, recurrence: editRecurrence, due_date: editDue || null }); setEditing(false); }
-  function handleSubtaskAdd(e: React.FormEvent) { e.preventDefault(); const t = subtaskInput.trim(); if (!t) return; setSubtaskInput(""); onAddSubtask(t); }
+  function commitEdit() { const t = editTitle.trim(); if (!t) return; onSave({ title: t, recurrence: editRec, due_date: editDue || null }); setEditing(false); }
+  function handleSubAdd(e: React.FormEvent) { e.preventDefault(); const t = subInput.trim(); if (!t) return; setSubInput(""); onAddSubtask(t); }
 
   const dueLabel = dueSoonLabel(task.due_date);
   const isOverdue = dueLabel === "Overdue";
   const doneCount = task.subtasks.filter(s => s.completed).length;
 
   return (
-    <div className={`transition-colors ${!isLast ? "border-b" : ""}`}
-      style={{ borderColor: "var(--line-soft)", backgroundColor: expanded ? "var(--surface-hov)" : undefined }}>
-
-      {/* Main row */}
-      <div className="flex items-start gap-3 px-4 py-3.5">
+    <div style={{ borderBottom: isLast ? "none" : "1px solid var(--line-soft)" }}>
+      <div className="flex items-start gap-3 px-4 py-4">
         {/* Checkbox */}
-        <button onClick={completed ? onUndo : onComplete}
-          aria-label={completed ? "Undo" : "Complete"}
-          className={`mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 transition-all active:scale-90 ${
-            completed ? "border-transparent bg-grad text-paper" : "border-line hover:border-gradA"
-          }`}>
+        <button onClick={completed ? onUndo : onComplete} aria-label={completed ? "Undo" : "Complete"}
+          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all active:scale-85"
+          style={completed
+            ? { background:"linear-gradient(135deg,#7C6FCD,#4ABFBF)", boxShadow:"0 2px 10px rgba(124,111,205,0.40)" }
+            : { border:"2px solid var(--line)", background:"transparent" }}
+          onMouseEnter={e => { if (!completed) e.currentTarget.style.borderColor="#7C6FCD"; }}
+          onMouseLeave={e => { if (!completed) e.currentTarget.style.borderColor="var(--line)"; }}>
           {completed && (
-            <svg width="9" height="7" viewBox="0 0 10 8" fill="none">
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
               <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           )}
@@ -306,8 +292,8 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
           {editing ? (
             <input ref={editRef} value={editTitle} onChange={e => setEditTitle(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
-              className="w-full bg-transparent font-body text-[15px] text-bright focus:outline-none border-b border-gradA pb-0.5"
-              maxLength={200} />
+              className="w-full bg-transparent font-body text-[15px] text-bright focus:outline-none border-b pb-0.5"
+              style={{ borderColor:"#7C6FCD" }} maxLength={200} />
           ) : (
             <button onClick={() => setExpanded(x => !x)} className="w-full text-left">
               <span className={`font-body text-[15px] leading-snug break-words ${completed ? "text-muted line-through" : "text-bright"}`}>
@@ -315,25 +301,27 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
               </span>
             </button>
           )}
-
-          {/* Badges row */}
+          {/* Badges */}
           {!editing && (dueLabel || task.recurrence !== "none" || task.subtasks.length > 0) && (
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {dueLabel && (
-                <span className={`rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide ${
-                  isOverdue ? "bg-warn/10 text-warn" : "border border-line text-muted"
-                }`} style={!isOverdue ? { backgroundColor: "var(--surface-2)" } : {}}>
+                <span className="rounded-full px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
+                  style={isOverdue
+                    ? { background:"var(--warn-bg)", border:"1px solid var(--warn-border)", color:"var(--warn)" }
+                    : { background:"var(--surface-2)", border:"1px solid var(--line)", color:"var(--muted)" }}>
                   {dueLabel}
                 </span>
               )}
               {task.recurrence !== "none" && (
-                <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted" style={{ backgroundColor: "var(--surface-2)" }}>
+                <span className="rounded-full px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted"
+                  style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
                   {RECURRENCE_LABELS[task.recurrence]}
                 </span>
               )}
               {task.subtasks.length > 0 && (
-                <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[9px] text-muted" style={{ backgroundColor: "var(--surface-2)" }}>
-                  {doneCount}/{task.subtasks.length} subtasks
+                <span className="rounded-full px-2.5 py-0.5 font-mono text-[9px] text-muted"
+                  style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
+                  {doneCount}/{task.subtasks.length}
                 </span>
               )}
             </div>
@@ -341,31 +329,32 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
         </div>
 
         {/* Action buttons */}
-        <div className="flex shrink-0 items-center gap-1 ml-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           {editing ? (
             <>
-              <button onClick={commitEdit} className="rounded-full bg-grad px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide text-paper active:scale-95">Save</button>
-              <button onClick={cancelEdit} className="font-mono text-[10px] text-muted hover:text-soft px-1">✕</button>
+              <button onClick={commitEdit} className="grad-btn rounded-full px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-white">Save</button>
+              <button onClick={cancelEdit} className="h-8 w-8 flex items-center justify-center rounded-full text-muted hover:text-soft transition-colors"
+                style={{ background:"var(--surface-2)" }}>✕</button>
             </>
           ) : (
             <>
               <button onClick={() => setExpanded(x => !x)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:text-soft active:scale-90"
-                style={{ backgroundColor: "var(--surface-2)" }}>
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:text-soft active:scale-90 transition-all"
+                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
                 <span className="font-mono text-[9px]">{expanded ? "▲" : "▼"}</span>
               </button>
               <button onClick={startEdit}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:text-soft active:scale-90"
-                style={{ backgroundColor: "var(--surface-2)" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:text-soft active:scale-90 transition-all"
+                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
               </button>
               <button onClick={onDelete}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:text-warn active:scale-90"
-                style={{ backgroundColor: "var(--surface-2)" }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:text-warn active:scale-90 transition-all"
+                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/>
                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                   <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
@@ -378,13 +367,12 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
 
       {/* Edit panel */}
       {editing && (
-        <div className="px-4 pb-4 pt-1 border-t" style={{ borderColor: "var(--line-soft)" }}>
-          <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 mb-3">
+        <div className="px-4 pb-4 pt-1" style={{ borderTop:"1px solid var(--line-soft)" }}>
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none mb-3">
             {RECURRENCE_OPTIONS.map(opt => (
-              <button type="button" key={opt} onClick={() => setEditRecurrence(opt)}
-                className={`shrink-0 rounded-full px-3 py-1.5 font-mono text-[10px] uppercase tracking-wide transition-all ${
-                  editRecurrence === opt ? "bg-grad text-paper" : "border border-line text-muted"
-                }`} style={editRecurrence !== opt ? { backgroundColor: "var(--surface-2)" } : {}}>
+              <button type="button" key={opt} onClick={() => setEditRec(opt)}
+                className={`shrink-0 rounded-full px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-wide transition-all active:scale-95 ${editRec === opt ? "grad-btn text-white" : "text-muted"}`}
+                style={editRec !== opt ? { background:"var(--surface-2)", border:"1px solid var(--line)" } : {}}>
                 {RECURRENCE_LABELS[opt]}
               </button>
             ))}
@@ -392,33 +380,36 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
           <div className="flex items-center gap-2">
             <label className="font-mono text-[10px] text-muted uppercase tracking-wider shrink-0">Due</label>
             <input type="date" value={editDue} onChange={e => setEditDue(e.target.value)}
-              className="rounded-lg border border-line px-2.5 py-1.5 font-mono text-[10px] text-muted focus:border-gradA focus:text-bright focus:outline-none"
-              style={{ backgroundColor: "var(--surface-2)" }} />
-            {editDue && <button type="button" onClick={() => setEditDue("")} className="font-mono text-[10px] text-muted hover:text-warn">Clear</button>}
+              className="rounded-xl px-3 py-1.5 font-mono text-[10px] text-muted focus:outline-none"
+              style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
+              onFocus={e => e.currentTarget.style.borderColor="#7C6FCD"}
+              onBlur={e => e.currentTarget.style.borderColor="var(--line)"} />
+            {editDue && <button type="button" onClick={() => setEditDue("")} className="font-mono text-[10px] text-muted hover:text-warn transition-colors">Clear</button>}
           </div>
         </div>
       )}
 
       {/* Subtasks */}
       {expanded && !editing && (
-        <div className="px-4 pb-4 border-t" style={{ borderColor: "var(--line-soft)" }}>
+        <div className="px-4 pb-4" style={{ borderTop:"1px solid var(--line-soft)" }}>
           {task.subtasks.length > 0 && (
-            <ul className="mt-3 mb-3 flex flex-col gap-1">
+            <ul className="mt-3 mb-3 flex flex-col gap-1.5">
               {task.subtasks.map(s => (
                 <SubtaskItem key={s.id} subtask={s}
-                  onToggle={c => onToggleSubtask(s.id, c)}
-                  onDelete={() => onDeleteSubtask(s.id)} />
+                  onToggle={c => onToggleSubtask(s.id, c)} onDelete={() => onDeleteSubtask(s.id)} />
               ))}
             </ul>
           )}
-          <form onSubmit={handleSubtaskAdd} className="flex items-center gap-2 mt-3 rounded-xl border border-line px-3 py-2.5 focus-within:border-gradA transition-colors" style={{ backgroundColor: "var(--surface-2)" }}>
+          <form onSubmit={handleSubAdd} className="mt-3 flex items-center gap-2 rounded-2xl px-4 py-2.5 transition-all"
+            style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
+            onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor="#7C6FCD"}
+            onBlurCapture={e => (e.currentTarget as HTMLElement).style.borderColor="var(--line)"}>
             <span className="font-mono text-[11px] text-muted shrink-0">↳</span>
-            <input value={subtaskInput} onChange={e => setSubtaskInput(e.target.value)}
-              placeholder="Add a subtask…"
+            <input value={subInput} onChange={e => setSubInput(e.target.value)} placeholder="Add a subtask…"
               className="flex-1 min-w-0 bg-transparent font-body text-[13px] text-bright placeholder:text-muted focus:outline-none"
               maxLength={200} />
-            <button type="submit" disabled={!subtaskInput.trim()}
-              className="shrink-0 font-mono text-[10px] uppercase tracking-wide grad-text disabled:[background:none] disabled:[-webkit-text-fill-color:var(--muted)]">
+            <button type="submit" disabled={!subInput.trim()}
+              className="shrink-0 font-mono text-[10px] uppercase tracking-wide grad-text disabled:[-webkit-text-fill-color:var(--muted)] disabled:[background:none] transition-all">
               Add
             </button>
           </form>
@@ -430,13 +421,17 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
 
 function SubtaskItem({ subtask, onToggle, onDelete }: { subtask: Subtask; onToggle: (c: boolean) => void; onDelete: () => void; }) {
   return (
-    <li className="flex items-center gap-2.5 rounded-lg px-2 py-2 transition-colors" style={{ backgroundColor: "var(--surface-hov)" }}>
+    <li className="flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors"
+      style={{ background:"var(--glass)", border:"1px solid var(--line-soft)" }}>
       <button onClick={() => onToggle(!subtask.completed)}
-        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-all active:scale-90 ${
-          subtask.completed ? "border-transparent bg-grad text-paper" : "border-line hover:border-gradA"
-        }`}>
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all active:scale-90"
+        style={subtask.completed
+          ? { background:"linear-gradient(135deg,#7C6FCD,#4ABFBF)", boxShadow:"0 1px 6px rgba(124,111,205,0.35)" }
+          : { border:"2px solid var(--line)", background:"transparent" }}
+        onMouseEnter={e => { if (!subtask.completed) e.currentTarget.style.borderColor="#7C6FCD"; }}
+        onMouseLeave={e => { if (!subtask.completed) e.currentTarget.style.borderColor="var(--line)"; }}>
         {subtask.completed && (
-          <svg width="7" height="6" viewBox="0 0 10 8" fill="none">
+          <svg width="8" height="6" viewBox="0 0 10 8" fill="none">
             <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )}
@@ -444,7 +439,8 @@ function SubtaskItem({ subtask, onToggle, onDelete }: { subtask: Subtask; onTogg
       <span className={`flex-1 min-w-0 font-body text-[13px] break-words ${subtask.completed ? "text-muted line-through" : "text-soft"}`}>
         {subtask.title}
       </span>
-      <button onClick={onDelete} className="shrink-0 flex h-6 w-6 items-center justify-center rounded-full text-muted hover:text-warn active:scale-90 transition-colors">
+      <button onClick={onDelete} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted hover:text-warn active:scale-90 transition-all"
+        style={{ background:"var(--surface-2)" }}>
         <span className="text-sm leading-none">×</span>
       </button>
     </li>
