@@ -129,10 +129,12 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
   return (
     <Link href={href}
       className={`relative px-3 py-1 rounded-full font-mono text-[11px] uppercase tracking-widest transition-all ${
-        active ? "grad-text" : "text-muted hover:text-soft"
+        active ? "" : "text-muted hover:text-soft"
       }`}
       style={active ? { background:"var(--glass)", boxShadow:"inset 0 1px 0 rgba(255,255,255,0.1)" } : {}}>
-      {label}
+      {active ? (
+        <span className="grad-text">{label}</span>
+      ) : label}
     </Link>
   );
 }
