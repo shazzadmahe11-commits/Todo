@@ -5,7 +5,7 @@
 /* ── Dark ─────────────────────────────────────────────────── */
 :root {
   color-scheme: dark;
-  --bg-from:     #0D0D18;
+  --bg-from:     #1a1030;
   --bg-to:       #0A1A1A;
   --glass:       rgba(255,255,255,0.05);
   --glass-hover: rgba(255,255,255,0.08);
