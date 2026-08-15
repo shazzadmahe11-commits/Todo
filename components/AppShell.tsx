@@ -49,6 +49,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   function toggleTheme() {
+    // Sync status bar color immediately
+    const next2 = theme === "dark" ? "light" : "dark";
+    let liveMeta = document.querySelector('meta[name="theme-color"][data-live]') as HTMLMetaElement | null;
+    if (!liveMeta) { liveMeta = document.createElement("meta"); liveMeta.name = "theme-color"; liveMeta.setAttribute("data-live","1"); document.head.appendChild(liveMeta); }
+    liveMeta.content = next2 === "dark" ? "#0D0D18" : "#E8E0FF";
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next); applyTheme(next);
     localStorage.setItem("theme", next);
@@ -113,7 +118,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <footer className="mt-10 flex items-center justify-between">
           <span className="font-mono text-[10px] text-muted truncate max-w-[200px]" style={{ opacity:0.4 }}>{user.email}</span>
-          <span className="font-mono text-[10px] grad-text" style={{ opacity:0.5 }}>Do.</span>
+          <span className="font-mono text-[10px] grad-text" style={{ opacity:0.5 }}>Kamla.</span>
         </footer>
       </div>
     </>
