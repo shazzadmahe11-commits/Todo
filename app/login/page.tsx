@@ -33,51 +33,61 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-6" style={{ backgroundColor: "var(--bg)" }}>
-      {/* Glow */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0"
-        style={{ background: "radial-gradient(ellipse 60% 40% at 20% -10%, var(--glow-a) 0%, transparent 70%), radial-gradient(ellipse 50% 35% at 85% 110%, var(--glow-b) 0%, transparent 70%)" }}
-      />
+    <div className="relative flex min-h-screen items-center justify-center px-5">
+      {/* Gradient background */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div style={{ position:"absolute", inset:0, background:"linear-gradient(145deg, var(--bg-from) 0%, var(--bg-to) 100%)" }} />
+        <div style={{ position:"absolute", top:"-20%", left:"-10%", width:"60%", height:"60%", borderRadius:"50%", background:"var(--glow-a)", filter:"blur(80px)" }} />
+        <div style={{ position:"absolute", bottom:"-20%", right:"-10%", width:"55%", height:"55%", borderRadius:"50%", background:"var(--glow-b)", filter:"blur(80px)" }} />
+      </div>
 
-      <div className="relative z-10 w-full max-w-sm">
+      <div className="relative z-10 w-full max-w-sm fade-up">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <h1 className="font-display text-4xl italic grad-text select-none">Kamla.</h1>
-          <p className="mt-2 font-mono text-[11px] uppercase tracking-widest text-muted">
+          <h1 className="font-display text-5xl italic grad-text select-none" style={{ lineHeight:1 }}>Do.</h1>
+          <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </p>
         </div>
 
-        {/* Card */}
-        <div className="card p-6">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
+        {/* Glass card */}
+        <div className="glass p-6 sm:p-8" style={{ boxShadow:"0 8px 40px rgba(0,0,0,0.15)" }}>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+            <div className="flex flex-col gap-2">
               <label className="font-mono text-[10px] uppercase tracking-widest text-muted">Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email"
-                className="rounded-lg border border-line px-3.5 py-2.5 font-body text-sm text-bright placeholder:text-muted focus:border-gradA focus:outline-none transition-colors"
-                style={{ backgroundColor: "var(--surface-2)" }} placeholder="you@example.com" />
+                placeholder="you@example.com"
+                className="w-full rounded-2xl px-4 py-3 font-body text-[15px] text-bright placeholder:text-muted focus:outline-none transition-all"
+                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
+                onFocus={e => e.currentTarget.style.borderColor = "#7C6FCD"}
+                onBlur={e => e.currentTarget.style.borderColor = "var(--line)"} />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2">
               <label className="font-mono text-[10px] uppercase tracking-widest text-muted">Password</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
                 autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={6}
-                className="rounded-lg border border-line px-3.5 py-2.5 font-body text-sm text-bright placeholder:text-muted focus:border-gradA focus:outline-none transition-colors"
-                style={{ backgroundColor: "var(--surface-2)" }} placeholder="••••••••" />
+                placeholder="••••••••"
+                className="w-full rounded-2xl px-4 py-3 font-body text-[15px] text-bright placeholder:text-muted focus:outline-none transition-all"
+                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
+                onFocus={e => e.currentTarget.style.borderColor = "#7C6FCD"}
+                onBlur={e => e.currentTarget.style.borderColor = "var(--line)"} />
             </div>
 
             {error && (
-              <div className="rounded-lg border border-warn/30 px-3.5 py-2.5 font-mono text-xs text-warn" style={{ backgroundColor: "rgba(224,112,96,0.08)" }}>
+              <div className="rounded-2xl px-4 py-3 font-mono text-xs text-warn"
+                style={{ background:"var(--warn-bg)", border:"1px solid var(--warn-border)" }}>
                 {error}
               </div>
             )}
             {message && (
-              <div className="rounded-lg border border-gradB/30 px-3.5 py-2.5 font-mono text-xs text-soft" style={{ backgroundColor: "rgba(74,191,191,0.08)" }}>
+              <div className="rounded-2xl px-4 py-3 font-mono text-xs text-soft"
+                style={{ background:"rgba(74,191,191,0.08)", border:"1px solid rgba(74,191,191,0.20)" }}>
                 {message}
               </div>
             )}
 
             <button type="submit" disabled={loading}
-              className="mt-1 rounded-lg bg-grad py-3 font-mono text-[11px] uppercase tracking-widest text-paper disabled:opacity-50 transition-opacity shadow-sm">
+              className="grad-btn w-full rounded-2xl py-3.5 font-mono text-[12px] uppercase tracking-widest text-white mt-1">
               {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
             </button>
           </form>
