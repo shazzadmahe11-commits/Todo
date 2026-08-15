@@ -24,14 +24,24 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Kamla.com",
+  title: "Kamla.",
   description: "A quiet place to keep track of what needs doing.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${display.variable} ${body.variable} ${mono.variable} font-body antialiased bg-paper text-bright`}>
+      <head>
+        {/* Status bar color — matches dark gradient start */}
+        <meta name="theme-color" content="#0D0D18" media="(prefers-color-scheme: dark)" />
+        {/* Matches light gradient start */}
+        <meta name="theme-color" content="#E8E0FF" media="(prefers-color-scheme: light)" />
+        {/* iOS safari full-screen */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Kamla." />
+      </head>
+      <body className={`${display.variable} ${body.variable} ${mono.variable} font-body antialiased`}>
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>
