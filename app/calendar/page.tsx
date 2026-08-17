@@ -1,15 +1,11 @@
 import CalendarBoard from "@/components/CalendarBoard";
 
-export const metadata = {
-  title: "Kamla. — History",
-};
-
 export default function CalendarPage() {
   return (
     <div>
-      <div className="mb-6 px-1">
-        <h1 className="font-display text-2xl italic grad-text select-none leading-none">History</h1>
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">Completed tasks</p>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.4px" }}>History</h1>
+        <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 3 }}>Tasks you've completed</p>
       </div>
       <CalendarBoard />
     </div>
