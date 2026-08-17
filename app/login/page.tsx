@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-sm fade-up">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <h1 className="font-display text-5xl italic grad-text select-none" style={{ lineHeight:1 }}>Do.</h1>
+          <h1 className="font-display text-5xl italic grad-text select-none" style={{ lineHeight:1 }}>Kamla.</h1>
           <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </p>
