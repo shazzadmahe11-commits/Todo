@@ -115,6 +115,12 @@ export default function TaskBoard() {
     await db.from("subtasks").delete().eq("id", id);
   }
 
+  async function editSubtask(id: string, title: string) {
+    setTasks(prev => prev.map(t => ({ ...t, subtasks: t.subtasks.map(s => s.id === id ? { ...s, title } : s) })));
+    try { const { error } = await db.from("subtasks").update({ title }).eq("id", id); if (error) throw error; }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not update subtask."); await loadTasks(); }
+  }
+
   const today = new Date();
   const dateStr = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
@@ -226,7 +232,8 @@ export default function TaskBoard() {
                     onSave={u => saveEdit(t.id, u)}
                     onAddSubtask={st => addSubtask(t.id, st)}
                     onToggleSubtask={toggleSubtask}
-                    onDeleteSubtask={deleteSubtask} />
+                    onDeleteSubtask={deleteSubtask}
+                    onEditSubtask={editSubtask} />
                 ))}
               </div>
             )}
@@ -253,7 +260,8 @@ export default function TaskBoard() {
                     onSave={u => saveEdit(t.id, u)}
                     onAddSubtask={st => addSubtask(t.id, st)}
                     onToggleSubtask={toggleSubtask}
-                    onDeleteSubtask={deleteSubtask} />
+                    onDeleteSubtask={deleteSubtask}
+                    onEditSubtask={editSubtask} />
                 ))}
               </div>
             </div>
@@ -264,29 +272,37 @@ export default function TaskBoard() {
   );
 }
 
-function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask }: {
+function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask, onEditSubtask }: {
   task: Task; completed?: boolean; isLast: boolean;
   onComplete?: () => void; onUndo?: () => void; onDelete: () => void;
   onSave: (u: { title?: string; recurrence?: Recurrence; due_date?: string | null }) => void;
   onAddSubtask: (t: string) => void;
   onToggleSubtask: (id: string, c: boolean) => void;
   onDeleteSubtask: (id: string) => void;
+  onEditSubtask: (id: string, title: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
   const [editRec, setEditRec] = useState<Recurrence>(task.recurrence);
   const [editDue, setEditDue] = useState(task.due_date ?? "");
   const [subInput, setSubInput] = useState("");
+  const [addingSub, setAddingSub] = useState(false);
   const [hovered, setHovered] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
+  const subRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editing) editRef.current?.focus(); }, [editing]);
+  useEffect(() => { if (addingSub) subRef.current?.focus(); }, [addingSub]);
 
-  function startEdit() { setEditTitle(task.title); setEditRec(task.recurrence); setEditDue(task.due_date ?? ""); setEditing(true); setExpanded(true); }
+  function startEdit() { setEditTitle(task.title); setEditRec(task.recurrence); setEditDue(task.due_date ?? ""); setEditing(true); }
   function cancelEdit() { setEditing(false); }
   function commitEdit() { const t = editTitle.trim(); if (!t) return; onSave({ title: t, recurrence: editRec, due_date: editDue || null }); setEditing(false); }
-  function handleSubAdd(e: React.FormEvent) { e.preventDefault(); const t = subInput.trim(); if (!t) return; setSubInput(""); onAddSubtask(t); }
+  function handleSubAdd(e: React.FormEvent) {
+    e.preventDefault();
+    const t = subInput.trim();
+    if (!t) { setAddingSub(false); return; }
+    setSubInput(""); setAddingSub(false); onAddSubtask(t);
+  }
 
   const dueLabel = dueSoonLabel(task.due_date);
   const isOverdue = dueLabel === "Overdue";
@@ -329,17 +345,14 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
               className="input" maxLength={200}
               style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }} />
           ) : (
-            <button onClick={() => setExpanded(x => !x)}
-              style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-              <span style={{
-                fontSize: 15, fontWeight: 500, lineHeight: 1.4,
-                color: completed ? "var(--muted)" : "var(--text)",
-                textDecoration: completed ? "line-through" : "none",
-                wordBreak: "break-word",
-              }}>
-                {task.title}
-              </span>
-            </button>
+            <span style={{
+              display: "block", fontSize: 15, fontWeight: 500, lineHeight: 1.4,
+              color: completed ? "var(--muted)" : "var(--text)",
+              textDecoration: completed ? "line-through" : "none",
+              wordBreak: "break-word",
+            }}>
+              {task.title}
+            </span>
           )}
 
           {/* Badges */}
@@ -379,11 +392,6 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
             </>
           ) : (
             <>
-              <ActionBtn onClick={() => setExpanded(x => !x)} label="Expand">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  {expanded ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
-                </svg>
-              </ActionBtn>
               <ActionBtn onClick={startEdit} label="Edit">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -431,40 +439,84 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
         </div>
       )}
 
-      {/* Subtasks */}
-      {expanded && !editing && (
+      {/* Subtasks — always visible alongside the task */}
+      {!editing && (
         <div style={{ padding: "0 16px 14px 50px", borderTop: "1px solid var(--border2)" }}>
           {task.subtasks.length > 0 && (
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 2, margin: "12px 0 10px" }}>
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 2, margin: "10px 0 4px" }}>
               {task.subtasks.map(s => (
                 <SubtaskItem key={s.id} subtask={s}
                   onToggle={c => onToggleSubtask(s.id, c)}
-                  onDelete={() => onDeleteSubtask(s.id)} />
+                  onDelete={() => onDeleteSubtask(s.id)}
+                  onEdit={t => onEditSubtask(s.id, t)} />
               ))}
             </ul>
           )}
-          <form onSubmit={handleSubAdd} style={{ display: "flex", gap: 8, marginTop: task.subtasks.length > 0 ? 4 : 12 }}>
-            <input value={subInput} onChange={e => setSubInput(e.target.value)}
-              placeholder="Add subtask…" className="input"
-              style={{ fontSize: 13, padding: "7px 12px" }} maxLength={200} />
-            <button type="submit" disabled={!subInput.trim()}
-              className="btn-accent" style={{ borderRadius: 10, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
-              Add
+
+          {addingSub ? (
+            <form onSubmit={handleSubAdd}
+              style={{ display: "flex", gap: 8, marginTop: task.subtasks.length > 0 ? 6 : 10 }}>
+              <input ref={subRef} value={subInput} onChange={e => setSubInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Escape") { setSubInput(""); setAddingSub(false); } }}
+                onBlur={() => { if (!subInput.trim()) setAddingSub(false); }}
+                placeholder="Subtask title…" className="input"
+                style={{ fontSize: 13, padding: "7px 12px" }} maxLength={200} />
+              <button type="submit" disabled={!subInput.trim()}
+                className="btn-accent" style={{ borderRadius: 10, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+                Add
+              </button>
+            </form>
+          ) : (
+            <button type="button" onClick={() => setAddingSub(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6, marginTop: task.subtasks.length > 0 ? 6 : 10,
+                background: "none", border: "none", cursor: "pointer", padding: "6px 4px",
+                fontSize: 12.5, fontWeight: 600, color: "var(--text3)",
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--accent-fg)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text3)"; }}>
+              <span style={{ fontSize: 15, lineHeight: 1 }}>+</span> Add subtask
             </button>
-          </form>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function SubtaskItem({ subtask, onToggle, onDelete }: { subtask: Subtask; onToggle: (c: boolean) => void; onDelete: () => void; }) {
+function SubtaskItem({ subtask, onToggle, onDelete, onEdit }: {
+  subtask: Subtask; onToggle: (c: boolean) => void; onDelete: () => void; onEdit: (title: string) => void;
+}) {
   const [h, setH] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(subtask.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Guards against the input's blur (fired as it unmounts) re-triggering
+  // commit() a second time right after Enter or Escape already handled it.
+  const settledRef = useRef(false);
+
+  useEffect(() => { if (editing) { inputRef.current?.focus(); inputRef.current?.select(); settledRef.current = false; } }, [editing]);
+  useEffect(() => { if (!editing) setVal(subtask.title); }, [subtask.title, editing]);
+
+  function commit() {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    const t = val.trim();
+    if (t && t !== subtask.title) onEdit(t);
+    else setVal(subtask.title);
+    setEditing(false);
+  }
+  function cancel() {
+    settledRef.current = true;
+    setVal(subtask.title);
+    setEditing(false);
+  }
+
   return (
     <li onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: 10,
-        backgroundColor: h ? "var(--bg2)" : "transparent", transition: "background 0.12s ease" }}>
-      <button onClick={() => onToggle(!subtask.completed)}
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderRadius: 10,
+        backgroundColor: h || editing ? "var(--bg2)" : "transparent", transition: "background 0.12s ease" }}>
+      <button onClick={() => onToggle(!subtask.completed)} aria-label={subtask.completed ? "Mark incomplete" : "Mark complete"}
         style={{
           flexShrink: 0, width: 18, height: 18, borderRadius: "50%", cursor: "pointer",
           border: subtask.completed ? "none" : "2px solid var(--border)",
@@ -478,24 +530,48 @@ function SubtaskItem({ subtask, onToggle, onDelete }: { subtask: Subtask; onTogg
           </svg>
         )}
       </button>
-      <span style={{ flex: 1, fontSize: 13, color: subtask.completed ? "var(--muted)" : "var(--text2)",
-        textDecoration: subtask.completed ? "line-through" : "none", wordBreak: "break-word" }}>
-        {subtask.title}
-      </span>
-      <button onClick={onDelete}
-        style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer",
-          fontSize: 16, lineHeight: 1, opacity: h ? 1 : 0, transition: "opacity 0.15s ease", padding: "2px 4px" }}>×</button>
+
+      {editing ? (
+        <input ref={inputRef} value={val} onChange={e => setVal(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") cancel(); }}
+          onBlur={commit} maxLength={200}
+          className="input" style={{ flex: 1, fontSize: 13, padding: "4px 8px" }} />
+      ) : (
+        <span onDoubleClick={() => setEditing(true)}
+          style={{ flex: 1, fontSize: 13, color: subtask.completed ? "var(--muted)" : "var(--text2)",
+            textDecoration: subtask.completed ? "line-through" : "none", wordBreak: "break-word", cursor: "text" }}>
+          {subtask.title}
+        </span>
+      )}
+
+      {!editing && (
+        <div style={{ display: "flex", alignItems: "center", gap: 2, opacity: h ? 1 : 0, transition: "opacity 0.15s ease" }}>
+          <ActionBtn onClick={() => setEditing(true)} label="Edit subtask" size={24}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </ActionBtn>
+          <ActionBtn onClick={onDelete} label="Delete subtask" danger size={24}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+            </svg>
+          </ActionBtn>
+        </div>
+      )}
     </li>
   );
 }
 
-function ActionBtn({ children, onClick, label, danger }: { children: React.ReactNode; onClick: () => void; label: string; danger?: boolean; }) {
+function ActionBtn({ children, onClick, label, danger, size = 30 }: { children: React.ReactNode; onClick: () => void; label: string; danger?: boolean; size?: number; }) {
   const [h, setH] = useState(false);
   return (
-    <button onClick={onClick} aria-label={label}
+    <button onClick={onClick} aria-label={label} title={label}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
       style={{
-        width: 30, height: 30, borderRadius: 8, border: "1px solid",
+        width: size, height: size, borderRadius: 8, border: "1px solid", flexShrink: 0,
         borderColor: h && danger ? "var(--warn-bdr)" : h ? "var(--border)" : "transparent",
         backgroundColor: h && danger ? "var(--warn-bg)" : h ? "var(--bg2)" : "transparent",
         color: h && danger ? "var(--warn)" : h ? "var(--text)" : "var(--muted)",
