@@ -15,9 +15,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" style={{ backgroundColor: "#0f0d1a" }}>
       <head>
-        <meta name="theme-color" content="#1a1030" />
+        {/* Solid color matching --bg in globals.css so status bar matches instantly */}
+        <meta name="theme-color" content="#0f0d1a" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Kamla." />
