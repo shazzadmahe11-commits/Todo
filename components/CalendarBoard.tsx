@@ -170,7 +170,7 @@ export default function CalendarBoard() {
                     <path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-                <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", wordBreak: "break-words" }}>{e.task_title}</span>
+                <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text)", wordBreak: "break-word" }}>{e.task_title}</span>
               </div>
             ))}
           </div>
