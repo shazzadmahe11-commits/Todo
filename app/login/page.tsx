@@ -33,7 +33,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-5">
+    <div className="relative flex min-h-screen items-center justify-center px-5" style={{ backgroundColor:"var(--bg)" }}>
       {/* Gradient background */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <div style={{ position:"absolute", inset:0, background:"linear-gradient(145deg, var(--bg-from) 0%, var(--bg-to) 100%)" }} />
