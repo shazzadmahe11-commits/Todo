@@ -286,22 +286,19 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
   const [editRec, setEditRec] = useState<Recurrence>(task.recurrence);
   const [editDue, setEditDue] = useState(task.due_date ?? "");
   const [subInput, setSubInput] = useState("");
-  const [addingSub, setAddingSub] = useState(false);
   const [hovered, setHovered] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
-  const subRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editing) editRef.current?.focus(); }, [editing]);
-  useEffect(() => { if (addingSub) subRef.current?.focus(); }, [addingSub]);
 
   function startEdit() { setEditTitle(task.title); setEditRec(task.recurrence); setEditDue(task.due_date ?? ""); setEditing(true); }
-  function cancelEdit() { setEditing(false); }
-  function commitEdit() { const t = editTitle.trim(); if (!t) return; onSave({ title: t, recurrence: editRec, due_date: editDue || null }); setEditing(false); }
+  function cancelEdit() { setEditing(false); setSubInput(""); }
+  function commitEdit() { const t = editTitle.trim(); if (!t) return; onSave({ title: t, recurrence: editRec, due_date: editDue || null }); setEditing(false); setSubInput(""); }
   function handleSubAdd(e: React.FormEvent) {
     e.preventDefault();
     const t = subInput.trim();
-    if (!t) { setAddingSub(false); return; }
-    setSubInput(""); setAddingSub(false); onAddSubtask(t);
+    if (!t) return;
+    setSubInput(""); onAddSubtask(t);
   }
 
   const dueLabel = dueSoonLabel(task.due_date);
@@ -436,29 +433,12 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
                 style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 16 }}>×</button>
             )}
           </div>
-        </div>
-      )}
 
-      {/* Subtasks — always visible alongside the task */}
-      {!editing && (
-        <div style={{ padding: "0 16px 14px 50px", borderTop: "1px solid var(--border2)" }}>
-          {task.subtasks.length > 0 && (
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 2, margin: "10px 0 4px" }}>
-              {task.subtasks.map(s => (
-                <SubtaskItem key={s.id} subtask={s}
-                  onToggle={c => onToggleSubtask(s.id, c)}
-                  onDelete={() => onDeleteSubtask(s.id)}
-                  onEdit={t => onEditSubtask(s.id, t)} />
-              ))}
-            </ul>
-          )}
-
-          {addingSub ? (
-            <form onSubmit={handleSubAdd}
-              style={{ display: "flex", gap: 8, marginTop: task.subtasks.length > 0 ? 6 : 10 }}>
-              <input ref={subRef} value={subInput} onChange={e => setSubInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Escape") { setSubInput(""); setAddingSub(false); } }}
-                onBlur={() => { if (!subInput.trim()) setAddingSub(false); }}
+          {/* Add subtask — only reachable while editing the task */}
+          <div style={{ paddingTop: 8, borderTop: "1px solid var(--border2)" }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 6 }}>Add subtask</label>
+            <form onSubmit={handleSubAdd} style={{ display: "flex", gap: 8 }}>
+              <input value={subInput} onChange={e => setSubInput(e.target.value)}
                 placeholder="Subtask title…" className="input"
                 style={{ fontSize: 13, padding: "7px 12px" }} maxLength={200} />
               <button type="submit" disabled={!subInput.trim()}
@@ -466,26 +446,29 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
                 Add
               </button>
             </form>
-          ) : (
-            <button type="button" onClick={() => setAddingSub(true)}
-              style={{
-                display: "flex", alignItems: "center", gap: 6, marginTop: task.subtasks.length > 0 ? 6 : 10,
-                background: "none", border: "none", cursor: "pointer", padding: "6px 4px",
-                fontSize: 12.5, fontWeight: 600, color: "var(--text3)",
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--accent-fg)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = "var(--text3)"; }}>
-              <span style={{ fontSize: 15, lineHeight: 1 }}>+</span> Add subtask
-            </button>
-          )}
+          </div>
+        </div>
+      )}
+
+      {/* Subtasks — always visible alongside the task, each row clearly separated */}
+      {task.subtasks.length > 0 && (
+        <div style={{ padding: "0 16px 14px 50px", borderTop: editing ? "none" : "1px solid var(--border2)" }}>
+          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", margin: "10px 0 0" }}>
+            {task.subtasks.map((s, i) => (
+              <SubtaskItem key={s.id} subtask={s} isLast={i === task.subtasks.length - 1}
+                onToggle={c => onToggleSubtask(s.id, c)}
+                onDelete={() => onDeleteSubtask(s.id)}
+                onEdit={t => onEditSubtask(s.id, t)} />
+            ))}
+          </ul>
         </div>
       )}
     </div>
   );
 }
 
-function SubtaskItem({ subtask, onToggle, onDelete, onEdit }: {
-  subtask: Subtask; onToggle: (c: boolean) => void; onDelete: () => void; onEdit: (title: string) => void;
+function SubtaskItem({ subtask, isLast, onToggle, onDelete, onEdit }: {
+  subtask: Subtask; isLast: boolean; onToggle: (c: boolean) => void; onDelete: () => void; onEdit: (title: string) => void;
 }) {
   const [h, setH] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -514,7 +497,8 @@ function SubtaskItem({ subtask, onToggle, onDelete, onEdit }: {
 
   return (
     <li onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", borderRadius: 10,
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+        borderBottom: isLast ? "none" : "1px solid var(--border2)",
         backgroundColor: h || editing ? "var(--bg2)" : "transparent", transition: "background 0.12s ease" }}>
       <button onClick={() => onToggle(!subtask.completed)} aria-label={subtask.completed ? "Mark incomplete" : "Mark complete"}
         style={{
