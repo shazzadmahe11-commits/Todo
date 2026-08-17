@@ -154,3 +154,18 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ── iOS status bar fix ──────────────────────────────────── */
+/* Paint a block of the gradient color at the very top of the
+   document so iOS Safari picks it up for the status bar tint  */
+html::before {
+  content: "";
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 50px);
+  background: var(--bg-from);
+  z-index: 9999;
+}
