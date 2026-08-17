@@ -21,7 +21,7 @@ export default function LoginPage() {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setMessage("Check your email for a confirmation link, then sign in.");
+        setMessage("Check your email for a confirmation link.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -33,70 +33,73 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-5" style={{ backgroundColor:"var(--bg)" }}>
-      {/* Gradient background */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div style={{ position:"absolute", inset:0, background:"linear-gradient(145deg, var(--bg-from) 0%, var(--bg-to) 100%)" }} />
-        <div style={{ position:"absolute", top:"-20%", left:"-10%", width:"60%", height:"60%", borderRadius:"50%", background:"var(--glow-a)", filter:"blur(80px)" }} />
-        <div style={{ position:"absolute", bottom:"-20%", right:"-10%", width:"55%", height:"55%", borderRadius:"50%", background:"var(--glow-b)", filter:"blur(80px)" }} />
-      </div>
+    <div style={{
+      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "24px 16px", backgroundColor: "var(--bg)",
+    }}>
+      <div style={{ width: "100%", maxWidth: 380 }} className="fade-up">
 
-      <div className="relative z-10 w-full max-w-sm fade-up">
         {/* Logo */}
-        <div className="mb-8 text-center">
-          <h1 className="font-display text-5xl italic grad-text select-none" style={{ lineHeight:1 }}>Kamla.</h1>
-          <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted">
-            {mode === "signin" ? "Welcome back" : "Create your account"}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 16,
+            backgroundColor: "var(--accent)", margin: "0 auto 16px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 8px 24px rgba(34,197,94,0.35)",
+          }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.5px", lineHeight: 1 }}>
+            Kamla.
+          </h1>
+          <p style={{ fontSize: 14, color: "var(--text3)", marginTop: 6 }}>
+            {mode === "signin" ? "Sign in to your account" : "Create your account"}
           </p>
         </div>
 
-        {/* Glass card */}
-        <div className="glass p-6 sm:p-8" style={{ boxShadow:"0 8px 40px rgba(0,0,0,0.15)" }}>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <label className="font-mono text-[10px] uppercase tracking-widest text-muted">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email"
-                placeholder="you@example.com"
-                className="w-full rounded-2xl px-4 py-3 font-body text-[15px] text-bright placeholder:text-muted focus:outline-none transition-all"
-                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
-                onFocus={e => e.currentTarget.style.borderColor = "#7C6FCD"}
-                onBlur={e => e.currentTarget.style.borderColor = "var(--line)"} />
+        {/* Card */}
+        <div className="card" style={{ padding: 24 }}>
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                placeholder="you@example.com" autoComplete="email"
+                className="input" />
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="font-mono text-[10px] uppercase tracking-widest text-muted">Password</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>Password</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-                autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={6}
-                placeholder="••••••••"
-                className="w-full rounded-2xl px-4 py-3 font-body text-[15px] text-bright placeholder:text-muted focus:outline-none transition-all"
-                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
-                onFocus={e => e.currentTarget.style.borderColor = "#7C6FCD"}
-                onBlur={e => e.currentTarget.style.borderColor = "var(--line)"} />
+                placeholder="••••••••" minLength={6}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                className="input" />
             </div>
 
             {error && (
-              <div className="rounded-2xl px-4 py-3 font-mono text-xs text-warn"
-                style={{ background:"var(--warn-bg)", border:"1px solid var(--warn-border)" }}>
+              <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: 13,
+                backgroundColor: "var(--warn-bg)", color: "var(--warn)", border: "1px solid var(--warn-bdr)" }}>
                 {error}
               </div>
             )}
             {message && (
-              <div className="rounded-2xl px-4 py-3 font-mono text-xs text-soft"
-                style={{ background:"rgba(74,191,191,0.08)", border:"1px solid rgba(74,191,191,0.20)" }}>
+              <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: 13,
+                backgroundColor: "var(--accent-bg)", color: "var(--accent-fg)", border: "1px solid var(--border)" }}>
                 {message}
               </div>
             )}
 
-            <button type="submit" disabled={loading}
-              className="grad-btn w-full rounded-2xl py-3.5 font-mono text-[12px] uppercase tracking-widest text-white mt-1">
+            <button type="submit" disabled={loading} className="btn-accent"
+              style={{ borderRadius: 12, padding: "12px 0", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 4 }}>
               {loading ? "…" : mode === "signin" ? "Sign in" : "Create account"}
             </button>
           </form>
         </div>
 
-        <p className="mt-5 text-center font-mono text-[11px] text-muted">
-          {mode === "signin" ? "No account? " : "Already have one? "}
+        <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "var(--text3)" }}>
+          {mode === "signin" ? "Don't have an account? " : "Already have an account? "}
           <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(null); setMessage(null); }}
-            className="text-soft hover:text-bright transition-colors underline underline-offset-2">
+            style={{ background: "none", border: "none", color: "var(--accent)", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>
             {mode === "signin" ? "Sign up" : "Sign in"}
           </button>
         </p>
