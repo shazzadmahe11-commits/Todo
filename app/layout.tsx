@@ -4,49 +4,21 @@ import { AuthProvider } from "@/context/AuthContext";
 import AppShell from "@/components/AppShell";
 import "./globals.css";
 
-const display = Fraunces({
-  subsets: ["latin"],
-  weight: ["500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-display",
-});
-
-const body = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-body",
-});
-
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-mono",
-});
+const display = Fraunces({ subsets:["latin"], weight:["500","600"], style:["normal","italic"], variable:"--font-display" });
+const body    = Inter({ subsets:["latin"], weight:["400","500","600"], variable:"--font-body" });
+const mono    = IBM_Plex_Mono({ subsets:["latin"], weight:["400","500"], variable:"--font-mono" });
 
 export const metadata: Metadata = {
   title: "Kamla.",
   description: "A quiet place to keep track of what needs doing.",
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)",  color: "#1a1030" },
-    { media: "(prefers-color-scheme: light)", color: "#ddd4f8" },
-  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/*
-          theme-color without a media query is the one browsers/iOS actually
-          read at page load. We set it here AND update it dynamically in
-          AppShell when the user toggles themes.
-        */}
         <meta name="theme-color" content="#1a1030" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        {/*
-          black-translucent lets the page render behind the status bar so
-          the gradient shows through instead of a solid bar.
-        */}
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Kamla." />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
