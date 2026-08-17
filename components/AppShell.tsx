@@ -30,12 +30,16 @@ function SignOutIcon() {
   );
 }
 
+// These must match --bg in globals.css exactly
+const DARK_BG  = "#0f0d1a";
+const LIGHT_BG = "#f0ecff";
+
 function applyTheme(t: "dark" | "light") {
   const isDark = t === "dark";
   document.documentElement.classList.toggle("light", !isDark);
 
-  // Update theme-color meta to match bg-from of whichever gradient is active
-  const color = isDark ? "#1a1030" : "#ddd4f8";
+  // Sync theme-color to the solid --bg value so status bar matches exactly
+  const color = isDark ? DARK_BG : LIGHT_BG;
   let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
   if (!meta) {
     meta = document.createElement("meta");
@@ -43,6 +47,10 @@ function applyTheme(t: "dark" | "light") {
     document.head.appendChild(meta);
   }
   meta.content = color;
+
+  // Also update document.documentElement background-color directly
+  document.documentElement.style.backgroundColor = color;
+  document.body.style.backgroundColor = color;
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -86,21 +94,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex items-center gap-2">
           <nav className="flex items-center gap-0.5 rounded-full px-2 py-1.5 glass"
-            style={{ boxShadow:"0 2px 16px rgba(0,0,0,0.12)" }}>
+            style={{ boxShadow:"0 2px 16px rgba(0,0,0,0.15)" }}>
             <NavLink href="/" label="Today" active={pathname === "/"} />
             <span className="mx-1" style={{ color:"var(--muted)", opacity:0.4 }}>·</span>
             <NavLink href="/calendar" label="History" active={pathname === "/calendar"} />
           </nav>
 
           <button onClick={toggleTheme} aria-label="Toggle theme"
-            className="flex h-9 w-9 items-center justify-center rounded-full glass text-muted hover:text-soft active:scale-90 transition-all"
-            style={{ boxShadow:"0 2px 12px rgba(0,0,0,0.10)" }}>
+            className="flex h-9 w-9 items-center justify-center rounded-full glass text-muted hover:text-soft active:scale-90 transition-all">
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
           </button>
 
           <button onClick={handleSignOut} aria-label="Sign out" title={`Sign out (${user.email})`}
-            className="flex h-9 w-9 items-center justify-center rounded-full glass text-muted hover:text-warn active:scale-90 transition-all"
-            style={{ boxShadow:"0 2px 12px rgba(0,0,0,0.10)" }}>
+            className="flex h-9 w-9 items-center justify-center rounded-full glass text-muted hover:text-warn active:scale-90 transition-all">
             <SignOutIcon />
           </button>
         </div>
