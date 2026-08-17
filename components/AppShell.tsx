@@ -30,31 +30,19 @@ function SignOutIcon() {
   );
 }
 
-const DARK_FROM  = "#1a1030";
-const DARK_TO    = "#0A1A1A";
-const LIGHT_FROM = "#ddd4f8";
-const LIGHT_TO   = "#D0F0F0";
-
-function applyThemeToDOM(t: "dark" | "light") {
+function applyTheme(t: "dark" | "light") {
   const isDark = t === "dark";
-  // Toggle class on root
   document.documentElement.classList.toggle("light", !isDark);
 
-  // Update html background gradient so it shows through status bar
-  const from = isDark ? DARK_FROM : LIGHT_FROM;
-  const to   = isDark ? DARK_TO   : LIGHT_TO;
-  document.documentElement.style.background =
-    `linear-gradient(145deg, ${from} 0%, ${to} 100%)`;
-
-  // Update theme-color meta so the status bar tint matches
-  let meta = document.querySelector('meta[name="theme-color"][data-js]') as HTMLMetaElement | null;
+  // Update theme-color meta to match bg-from of whichever gradient is active
+  const color = isDark ? "#1a1030" : "#ddd4f8";
+  let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
   if (!meta) {
     meta = document.createElement("meta");
     meta.name = "theme-color";
-    meta.setAttribute("data-js", "1");
     document.head.appendChild(meta);
   }
-  meta.content = isDark ? DARK_FROM : LIGHT_FROM;
+  meta.content = color;
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -67,13 +55,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const saved = (localStorage.getItem("theme") as "dark" | "light") ?? "dark";
     setTheme(saved);
-    applyThemeToDOM(saved);
+    applyTheme(saved);
   }, []);
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    applyThemeToDOM(next);
+    applyTheme(next);
     localStorage.setItem("theme", next);
   }
 
@@ -90,52 +78,41 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <>
-      {/* Glow orbs — fixed so they cover the whole screen incl. status bar */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div style={{ position:"absolute", top:"-20%", left:"-10%", width:"60%", height:"60%", borderRadius:"50%", background:"var(--glow-a)", filter:"blur(80px)" }} />
-        <div style={{ position:"absolute", bottom:"-20%", right:"-10%", width:"55%", height:"55%", borderRadius:"50%", background:"var(--glow-b)", filter:"blur(80px)" }} />
-        <div style={{ position:"absolute", top:"40%", left:"30%", width:"40%", height:"40%", borderRadius:"50%", background:"var(--glow-c)", filter:"blur(60px)" }} />
-      </div>
+    <div className="relative z-10 mx-auto flex min-h-screen max-w-2xl flex-col px-4 pb-28 pt-6 sm:px-8 sm:pt-10">
+      <header className="mb-8 flex items-center justify-between gap-3">
+        <Link href="/" className="font-display text-[28px] italic grad-text select-none leading-none shrink-0">
+          Kamla.
+        </Link>
 
-      <div className="relative z-10 mx-auto flex min-h-screen min-h-dvh max-w-2xl flex-col px-4 pb-28 pt-6 sm:px-8 sm:pt-10">
+        <div className="flex items-center gap-2">
+          <nav className="flex items-center gap-0.5 rounded-full px-2 py-1.5 glass"
+            style={{ boxShadow:"0 2px 16px rgba(0,0,0,0.12)" }}>
+            <NavLink href="/" label="Today" active={pathname === "/"} />
+            <span className="mx-1" style={{ color:"var(--muted)", opacity:0.4 }}>·</span>
+            <NavLink href="/calendar" label="History" active={pathname === "/calendar"} />
+          </nav>
 
-        {/* Header */}
-        <header className="mb-8 flex items-center justify-between gap-3">
-          <Link href="/" className="font-display text-[28px] italic grad-text select-none leading-none shrink-0">
-            Kamla.
-          </Link>
+          <button onClick={toggleTheme} aria-label="Toggle theme"
+            className="flex h-9 w-9 items-center justify-center rounded-full glass text-muted hover:text-soft active:scale-90 transition-all"
+            style={{ boxShadow:"0 2px 12px rgba(0,0,0,0.10)" }}>
+            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          </button>
 
-          <div className="flex items-center gap-2">
-            <nav className="flex items-center gap-0.5 rounded-full px-2 py-1.5 glass"
-              style={{ boxShadow:"0 2px 16px rgba(0,0,0,0.12)" }}>
-              <NavLink href="/" label="Today" active={pathname === "/"} />
-              <span className="mx-1" style={{ color:"var(--muted)", opacity:0.4 }}>·</span>
-              <NavLink href="/calendar" label="History" active={pathname === "/calendar"} />
-            </nav>
+          <button onClick={handleSignOut} aria-label="Sign out" title={`Sign out (${user.email})`}
+            className="flex h-9 w-9 items-center justify-center rounded-full glass text-muted hover:text-warn active:scale-90 transition-all"
+            style={{ boxShadow:"0 2px 12px rgba(0,0,0,0.10)" }}>
+            <SignOutIcon />
+          </button>
+        </div>
+      </header>
 
-            <button onClick={toggleTheme} aria-label="Toggle theme"
-              className="flex h-9 w-9 items-center justify-center rounded-full glass text-muted hover:text-soft active:scale-90 transition-all"
-              style={{ boxShadow:"0 2px 12px rgba(0,0,0,0.10)" }}>
-              {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-            </button>
+      <main className="flex-1 min-w-0 fade-up">{children}</main>
 
-            <button onClick={handleSignOut} aria-label="Sign out" title={`Sign out (${user.email})`}
-              className="flex h-9 w-9 items-center justify-center rounded-full glass text-muted hover:text-warn active:scale-90 transition-all"
-              style={{ boxShadow:"0 2px 12px rgba(0,0,0,0.10)" }}>
-              <SignOutIcon />
-            </button>
-          </div>
-        </header>
-
-        <main className="flex-1 min-w-0 fade-up">{children}</main>
-
-        <footer className="mt-10 flex items-center justify-between">
-          <span className="font-mono text-[10px] truncate max-w-[200px]" style={{ color:"var(--muted)", opacity:0.5 }}>{user.email}</span>
-          <span className="font-mono text-[10px] grad-text" style={{ opacity:0.5 }}>Kamla.</span>
-        </footer>
-      </div>
-    </>
+      <footer className="mt-10 flex items-center justify-between">
+        <span className="font-mono text-[10px] truncate max-w-[200px]" style={{ color:"var(--muted)", opacity:0.5 }}>{user.email}</span>
+        <span className="font-mono text-[10px] grad-text" style={{ opacity:0.5 }}>Kamla.</span>
+      </footer>
+    </div>
   );
 }
 
