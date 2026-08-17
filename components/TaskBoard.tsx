@@ -335,7 +335,7 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
                 fontSize: 15, fontWeight: 500, lineHeight: 1.4,
                 color: completed ? "var(--muted)" : "var(--text)",
                 textDecoration: completed ? "line-through" : "none",
-                wordBreak: "break-words",
+                wordBreak: "break-word",
               }}>
                 {task.title}
               </span>
@@ -479,7 +479,7 @@ function SubtaskItem({ subtask, onToggle, onDelete }: { subtask: Subtask; onTogg
         )}
       </button>
       <span style={{ flex: 1, fontSize: 13, color: subtask.completed ? "var(--muted)" : "var(--text2)",
-        textDecoration: subtask.completed ? "line-through" : "none", wordBreak: "break-words" }}>
+        textDecoration: subtask.completed ? "line-through" : "none", wordBreak: "break-word" }}>
         {subtask.title}
       </span>
       <button onClick={onDelete}
