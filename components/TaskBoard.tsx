@@ -18,51 +18,51 @@ export default function TaskBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [recurrence, setRecurrence] = useState<Recurrence>("none");
   const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [showForm, setShowForm] = useState(false);
 
   async function loadTasks() {
     if (!user) return;
     setLoading(true); setError(null);
     try {
-      const { data: taskData, error: te } = await supabase.from("tasks").select("id,title,recurrence,archived,due_date,created_at").eq("archived", false).order("created_at", { ascending: true });
+      const { data: td, error: te } = await supabase.from("tasks").select("id,title,recurrence,archived,due_date,created_at").eq("archived", false).order("created_at", { ascending: true });
       if (te) throw te;
-      const { data: compData, error: ce } = await supabase.from("completions").select("task_id,completed_on").order("completed_on", { ascending: false });
+      const { data: cd, error: ce } = await supabase.from("completions").select("task_id,completed_on").order("completed_on", { ascending: false });
       if (ce) throw ce;
-      const { data: subData, error: se } = await supabase.from("subtasks").select("id,task_id,title,completed,position,created_at").order("position", { ascending: true });
+      const { data: sd, error: se } = await supabase.from("subtasks").select("id,task_id,title,completed,position,created_at").order("position", { ascending: true });
       if (se) throw se;
-      const lastCompleted = new Map<string, string>();
-      for (const c of (compData ?? []) as CompletionRowDB[]) { if (!lastCompleted.has(c.task_id)) lastCompleted.set(c.task_id, c.completed_on); }
-      const subtasksByTask = new Map<string, Subtask[]>();
-      for (const s of (subData ?? []) as SubtaskRowDB[]) { const l = subtasksByTask.get(s.task_id) ?? []; l.push(s); subtasksByTask.set(s.task_id, l); }
-      setTasks(((taskData ?? []) as TaskRowDB[]).map(t => ({ ...t, last_completed_on: lastCompleted.get(t.id) ?? null, subtasks: subtasksByTask.get(t.id) ?? [] })));
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not load tasks."); }
+      const lc = new Map<string, string>();
+      for (const c of (cd ?? []) as CompletionRowDB[]) { if (!lc.has(c.task_id)) lc.set(c.task_id, c.completed_on); }
+      const sm = new Map<string, Subtask[]>();
+      for (const s of (sd ?? []) as SubtaskRowDB[]) { const l = sm.get(s.task_id) ?? []; l.push(s); sm.set(s.task_id, l); }
+      setTasks(((td ?? []) as TaskRowDB[]).map(t => ({ ...t, last_completed_on: lc.get(t.id) ?? null, subtasks: sm.get(t.id) ?? [] })));
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not load."); }
     finally { setLoading(false); }
   }
 
   useEffect(() => { loadTasks(); }, [user]);
 
   const { pending, done } = useMemo(() => {
-    const now = new Date(); const pending: Task[] = [], done: Task[] = [];
-    for (const t of tasks) (isPending(t, now) ? pending : done).push(t);
-    pending.sort((a, b) => (a.due_date ?? "9999") < (b.due_date ?? "9999") ? -1 : 1);
-    return { pending, done };
+    const now = new Date(); const p: Task[] = [], d: Task[] = [];
+    for (const t of tasks) (isPending(t, now) ? p : d).push(t);
+    p.sort((a, b) => (a.due_date ?? "9999") < (b.due_date ?? "9999") ? -1 : 1);
+    return { pending: p, done: d };
   }, [tasks]);
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = title.trim();
-    if (!trimmed || submitting || !user) return;
-    setSubmitting(true); setError(null);
+    const t = title.trim();
+    if (!t || submitting || !user) return;
+    setSubmitting(true);
     try {
-      const { error } = await db.from("tasks").insert({ title: trimmed, recurrence, due_date: dueDate || null, user_id: user.id });
+      const { error } = await db.from("tasks").insert({ title: t, recurrence, due_date: dueDate || null, user_id: user.id });
       if (error) throw error;
       setTitle(""); setRecurrence("none"); setDueDate(""); setShowForm(false);
       await loadTasks();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not add task."); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not add."); }
     finally { setSubmitting(false); }
   }
 
@@ -93,152 +93,174 @@ export default function TaskBoard() {
     try { await db.from("tasks").delete().eq("id", id); } catch { await loadTasks(); }
   }
 
-  async function saveTaskEdit(id: string, updates: { title?: string; recurrence?: Recurrence; due_date?: string | null }) {
-    try { const { error } = await db.from("tasks").update(updates).eq("id", id); if (error) throw error; await loadTasks(); }
+  async function saveEdit(id: string, u: { title?: string; recurrence?: Recurrence; due_date?: string | null }) {
+    try { const { error } = await db.from("tasks").update(u).eq("id", id); if (error) throw error; await loadTasks(); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not save."); }
   }
 
-  async function addSubtask(taskId: string, subTitle: string) {
+  async function addSubtask(taskId: string, t: string) {
     if (!user) return;
     const { count } = await db.from("subtasks").select("id", { count: "exact", head: true }).eq("task_id", taskId);
-    const { error } = await db.from("subtasks").insert({ task_id: taskId, title: subTitle, position: count ?? 0, user_id: user.id });
+    const { error } = await db.from("subtasks").insert({ task_id: taskId, title: t, position: count ?? 0, user_id: user.id });
     if (error) setError(error.message); else await loadTasks();
   }
 
-  async function toggleSubtask(subtaskId: string, completed: boolean) {
-    setTasks(prev => prev.map(t => ({ ...t, subtasks: t.subtasks.map(s => s.id === subtaskId ? { ...s, completed } : s) })));
-    await db.from("subtasks").update({ completed }).eq("id", subtaskId);
+  async function toggleSubtask(id: string, completed: boolean) {
+    setTasks(prev => prev.map(t => ({ ...t, subtasks: t.subtasks.map(s => s.id === id ? { ...s, completed } : s) })));
+    await db.from("subtasks").update({ completed }).eq("id", id);
   }
 
-  async function deleteSubtask(subtaskId: string) {
-    setTasks(prev => prev.map(t => ({ ...t, subtasks: t.subtasks.filter(s => s.id !== subtaskId) })));
-    await db.from("subtasks").delete().eq("id", subtaskId);
+  async function deleteSubtask(id: string) {
+    setTasks(prev => prev.map(t => ({ ...t, subtasks: t.subtasks.filter(s => s.id !== id) })));
+    await db.from("subtasks").delete().eq("id", id);
   }
+
+  const today = new Date();
+  const dateStr = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Add task trigger */}
-      {!showForm ? (
-        <button onClick={() => setShowForm(true)}
-          className="glass glass-hover w-full flex items-center gap-3 px-5 py-4 text-left active:scale-[0.99] transition-all"
-          style={{ boxShadow:"0 4px 24px rgba(0,0,0,0.10)" }}>
-          <span className="grad-btn flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white text-xl leading-none font-light">+</span>
-          <span className="font-body text-[15px] text-muted">Add a task…</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.4px", lineHeight: 1.2 }}>Today</h1>
+          <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 3 }}>{dateStr}</p>
+        </div>
+        <button onClick={() => setShowForm(s => !s)}
+          className="btn-accent"
+          style={{ borderRadius: 12, padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Add task
         </button>
-      ) : (
-        <div className="glass p-5" style={{ boxShadow:"0 8px 32px rgba(0,0,0,0.12)" }}>
-          <div className="mb-4 flex items-center justify-between">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted">New task</p>
-            <button onClick={() => { setShowForm(false); setTitle(""); setRecurrence("none"); setDueDate(""); }}
-              className="h-7 w-7 flex items-center justify-center rounded-full text-muted hover:text-soft transition-colors"
-              style={{ background:"var(--surface-2)" }}>
-              <span className="text-sm">✕</span>
-            </button>
-          </div>
-          <form onSubmit={addTask} className="flex flex-col gap-4">
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What needs doing?" autoFocus
-              className="w-full bg-transparent font-body text-[16px] text-bright placeholder:text-muted focus:outline-none border-b pb-2 transition-colors"
-              style={{ borderColor:"var(--line)" }}
-              onFocus={e => e.currentTarget.style.borderColor = "#7C6FCD"}
-              onBlur={e => e.currentTarget.style.borderColor = "var(--line)"}
-              maxLength={200} />
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
+      </div>
+
+      {/* Add form */}
+      {showForm && (
+        <div className="card fade-up" style={{ padding: 20 }}>
+          <form onSubmit={addTask} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What needs doing?"
+              autoFocus className="input" maxLength={200}
+              style={{ fontSize: 16, fontWeight: 500 }} />
+
+            {/* Recurrence */}
+            <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }} className="no-scroll">
               {RECURRENCE_OPTIONS.map(opt => (
                 <button type="button" key={opt} onClick={() => setRecurrence(opt)}
-                  className={`shrink-0 rounded-full px-4 py-1.5 font-mono text-[10px] uppercase tracking-wide transition-all active:scale-95 ${
-                    recurrence === opt ? "grad-btn text-white" : "text-muted hover:text-soft"
-                  }`}
-                  style={recurrence !== opt ? { background:"var(--surface-2)", border:"1px solid var(--line)" } : {}}>
+                  style={{
+                    flexShrink: 0, padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 600,
+                    fontFamily: "'JetBrains Mono', monospace", cursor: "pointer", border: "1.5px solid",
+                    borderColor: recurrence === opt ? "var(--accent)" : "var(--border)",
+                    backgroundColor: recurrence === opt ? "var(--accent-bg)" : "var(--bg2)",
+                    color: recurrence === opt ? "var(--accent-fg)" : "var(--text3)",
+                    transition: "all 0.12s ease",
+                  }}>
                   {RECURRENCE_LABELS[opt]}
                 </button>
               ))}
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <label className="font-mono text-[10px] uppercase tracking-wider text-muted shrink-0">Due</label>
+
+            {/* Due date + submit */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap" }}>Due</label>
                 <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-                  className="rounded-xl px-3 py-1.5 font-mono text-[11px] text-muted focus:outline-none transition-colors"
-                  style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
-                  onFocus={e => e.currentTarget.style.borderColor = "#7C6FCD"}
-                  onBlur={e => e.currentTarget.style.borderColor = "var(--line)"} />
-                {dueDate && <button type="button" onClick={() => setDueDate("")} className="text-muted hover:text-warn text-sm transition-colors">✕</button>}
+                  className="input" style={{ width: "auto", padding: "6px 10px", fontSize: 12 }} />
+                {dueDate && (
+                  <button type="button" onClick={() => setDueDate("")}
+                    style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+                )}
               </div>
-              <button type="submit" disabled={!title.trim() || submitting} className="grad-btn shrink-0 rounded-full px-6 py-2.5 font-mono text-[11px] uppercase tracking-wider text-white">
-                Add
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={() => { setShowForm(false); setTitle(""); setRecurrence("none"); setDueDate(""); }}
+                  className="btn-ghost" style={{ borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={!title.trim() || submitting}
+                  className="btn-accent" style={{ borderRadius: 10, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                  {submitting ? "…" : "Add"}
+                </button>
+              </div>
             </div>
           </form>
         </div>
       )}
 
       {error && (
-        <div className="rounded-2xl px-4 py-3 font-mono text-xs text-warn"
-          style={{ background:"var(--warn-bg)", border:"1px solid var(--warn-border)" }}>
+        <div style={{ padding: "10px 14px", borderRadius: 10, fontSize: 13,
+          backgroundColor: "var(--warn-bg)", color: "var(--warn)", border: "1px solid var(--warn-bdr)" }}>
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="flex gap-2">
-            {[0,1,2].map(i => (
-              <div key={i} className="h-2 w-2 rounded-full pulse-dot"
-                style={{ background:"linear-gradient(135deg,#7C6FCD,#4ABFBF)", animationDelay:`${i*200}ms` }} />
-            ))}
-          </div>
+        <div style={{ display: "flex", justifyContent: "center", padding: "60px 0" }}>
+          <div style={{ width: 24, height: 24, borderRadius: "50%", border: "2.5px solid var(--border)", borderTopColor: "var(--accent)" }} className="spin" />
         </div>
       ) : (
-        <div className="flex flex-col gap-5">
-          <Section label="To do" count={pending.length}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {/* Pending tasks */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                To do
+              </span>
+              {pending.length > 0 && (
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent-fg)", backgroundColor: "var(--accent-bg)",
+                  border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
+                  {pending.length}
+                </span>
+              )}
+            </div>
+
             {pending.length === 0 ? (
-              <div className="glass flex flex-col items-center gap-3 py-14 text-center">
-                <div className="grad-btn flex h-12 w-12 items-center justify-center rounded-full text-2xl text-white">✓</div>
-                <p className="font-body text-sm text-muted">All clear. Nothing left to do.</p>
+              <div className="card" style={{ padding: "40px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>🌿</div>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--text2)" }}>All done for now</p>
+                <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Add a task to get started</p>
               </div>
             ) : (
-              <div className="glass overflow-hidden" style={{ boxShadow:"0 4px 24px rgba(0,0,0,0.10)" }}>
+              <div className="card" style={{ overflow: "hidden" }}>
                 {pending.map((t, i) => (
                   <TaskItem key={t.id} task={t} isLast={i === pending.length - 1}
-                    onComplete={() => completeTask(t.id)} onDelete={() => deleteTask(t.id)}
-                    onSave={u => saveTaskEdit(t.id, u)} onAddSubtask={st => addSubtask(t.id, st)}
-                    onToggleSubtask={toggleSubtask} onDeleteSubtask={deleteSubtask} />
+                    onComplete={() => completeTask(t.id)}
+                    onDelete={() => deleteTask(t.id)}
+                    onSave={u => saveEdit(t.id, u)}
+                    onAddSubtask={st => addSubtask(t.id, st)}
+                    onToggleSubtask={toggleSubtask}
+                    onDeleteSubtask={deleteSubtask} />
                 ))}
               </div>
             )}
-          </Section>
+          </div>
 
+          {/* Done tasks */}
           {done.length > 0 && (
-            <Section label="Done" count={done.length}>
-              <div className="glass overflow-hidden" style={{ boxShadow:"0 4px 24px rgba(0,0,0,0.08)", opacity:0.8 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                  Completed
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)",
+                  backgroundColor: "var(--bg2)", border: "1px solid var(--border)",
+                  borderRadius: 999, padding: "1px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
+                  {done.length}
+                </span>
+              </div>
+              <div className="card" style={{ overflow: "hidden", opacity: 0.75 }}>
                 {done.map((t, i) => (
                   <TaskItem key={t.id} task={t} completed isLast={i === done.length - 1}
-                    onUndo={() => undoComplete(t.id)} onDelete={() => deleteTask(t.id)}
-                    onSave={u => saveTaskEdit(t.id, u)} onAddSubtask={st => addSubtask(t.id, st)}
-                    onToggleSubtask={toggleSubtask} onDeleteSubtask={deleteSubtask} />
+                    onUndo={() => undoComplete(t.id)}
+                    onDelete={() => deleteTask(t.id)}
+                    onSave={u => saveEdit(t.id, u)}
+                    onAddSubtask={st => addSubtask(t.id, st)}
+                    onToggleSubtask={toggleSubtask}
+                    onDeleteSubtask={deleteSubtask} />
                 ))}
               </div>
-            </Section>
+            </div>
           )}
         </div>
       )}
     </div>
-  );
-}
-
-function Section({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-2.5 px-1">
-        <h2 className="font-mono text-[10px] uppercase tracking-widest text-muted">{label}</h2>
-        {count > 0 && (
-          <span className="rounded-full px-2 py-0.5 font-mono text-[10px] text-muted"
-            style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
-            {count}
-          </span>
-        )}
-      </div>
-      {children}
-    </section>
   );
 }
 
@@ -256,6 +278,7 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
   const [editRec, setEditRec] = useState<Recurrence>(task.recurrence);
   const [editDue, setEditDue] = useState(task.due_date ?? "");
   const [subInput, setSubInput] = useState("");
+  const [hovered, setHovered] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editing) editRef.current?.focus(); }, [editing]);
@@ -270,58 +293,71 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
   const doneCount = task.subtasks.filter(s => s.completed).length;
 
   return (
-    <div style={{ borderBottom: isLast ? "none" : "1px solid var(--line-soft)" }}>
-      <div className="flex items-start gap-3 px-4 py-4">
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ borderBottom: isLast ? "none" : "1px solid var(--border2)", transition: "background 0.12s ease",
+        backgroundColor: hovered && !editing ? "var(--bg2)" : "transparent" }}>
+
+      {/* Main row */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px" }}>
         {/* Checkbox */}
-        <button onClick={completed ? onUndo : onComplete} aria-label={completed ? "Undo" : "Complete"}
-          className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all active:scale-85"
-          style={completed
-            ? { background:"linear-gradient(135deg,#7C6FCD,#4ABFBF)", boxShadow:"0 2px 10px rgba(124,111,205,0.40)" }
-            : { border:"2px solid var(--line)", background:"transparent" }}
-          onMouseEnter={e => { if (!completed) e.currentTarget.style.borderColor="#7C6FCD"; }}
-          onMouseLeave={e => { if (!completed) e.currentTarget.style.borderColor="var(--line)"; }}>
+        <button onClick={completed ? onUndo : onComplete}
+          style={{
+            flexShrink: 0, marginTop: 2,
+            width: 22, height: 22, borderRadius: "50%", cursor: "pointer",
+            border: completed ? "none" : "2px solid var(--border)",
+            backgroundColor: completed ? "var(--accent)" : "transparent",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.15s ease",
+            boxShadow: completed ? "0 2px 8px rgba(34,197,94,0.30)" : "none",
+          }}
+          onMouseEnter={e => { if (!completed) { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--accent-bg)"; } }}
+          onMouseLeave={e => { if (!completed) { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; } }}>
           {completed && (
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-              <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg width="11" height="9" viewBox="0 0 12 10" fill="none">
+              <path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           )}
         </button>
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
+        <div style={{ flex: 1, minWidth: 0 }}>
           {editing ? (
             <input ref={editRef} value={editTitle} onChange={e => setEditTitle(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
-              className="w-full bg-transparent font-body text-[15px] text-bright focus:outline-none border-b pb-0.5"
-              style={{ borderColor:"#7C6FCD" }} maxLength={200} />
+              className="input" maxLength={200}
+              style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }} />
           ) : (
-            <button onClick={() => setExpanded(x => !x)} className="w-full text-left">
-              <span className={`font-body text-[15px] leading-snug break-words ${completed ? "text-muted line-through" : "text-bright"}`}>
+            <button onClick={() => setExpanded(x => !x)}
+              style={{ width: "100%", textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+              <span style={{
+                fontSize: 15, fontWeight: 500, lineHeight: 1.4,
+                color: completed ? "var(--muted)" : "var(--text)",
+                textDecoration: completed ? "line-through" : "none",
+                wordBreak: "break-words",
+              }}>
                 {task.title}
               </span>
             </button>
           )}
+
           {/* Badges */}
           {!editing && (dueLabel || task.recurrence !== "none" || task.subtasks.length > 0) && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
               {dueLabel && (
-                <span className="rounded-full px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-wide"
-                  style={isOverdue
-                    ? { background:"var(--warn-bg)", border:"1px solid var(--warn-border)", color:"var(--warn)" }
-                    : { background:"var(--surface-2)", border:"1px solid var(--line)", color:"var(--muted)" }}>
-                  {dueLabel}
+                <span className={isOverdue ? "pill pill-warn" : "pill"} style={!isOverdue ? { color: "var(--text3)", backgroundColor: "var(--bg2)" } : {}}>
+                  {isOverdue ? "⚠ " : "📅 "}{dueLabel}
                 </span>
               )}
               {task.recurrence !== "none" && (
-                <span className="rounded-full px-2.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-muted"
-                  style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
-                  {RECURRENCE_LABELS[task.recurrence]}
+                <span className="pill" style={{ color: "var(--text3)", backgroundColor: "var(--bg2)", border: "1px solid var(--border)" }}>
+                  ↻ {RECURRENCE_LABELS[task.recurrence]}
                 </span>
               )}
               {task.subtasks.length > 0 && (
-                <span className="rounded-full px-2.5 py-0.5 font-mono text-[9px] text-muted"
-                  style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
-                  {doneCount}/{task.subtasks.length}
+                <span className="pill" style={{ color: "var(--text3)", backgroundColor: "var(--bg2)", border: "1px solid var(--border)" }}>
+                  {doneCount}/{task.subtasks.length} subtasks
                 </span>
               )}
             </div>
@@ -329,37 +365,38 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
         </div>
 
         {/* Action buttons */}
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
           {editing ? (
             <>
-              <button onClick={commitEdit} className="grad-btn rounded-full px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-white">Save</button>
-              <button onClick={cancelEdit} className="h-8 w-8 flex items-center justify-center rounded-full text-muted hover:text-soft transition-colors"
-                style={{ background:"var(--surface-2)" }}>✕</button>
+              <button onClick={commitEdit}
+                className="btn-accent" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                Save
+              </button>
+              <button onClick={cancelEdit}
+                className="btn-ghost" style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                Cancel
+              </button>
             </>
           ) : (
             <>
-              <button onClick={() => setExpanded(x => !x)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:text-soft active:scale-90 transition-all"
-                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
-                <span className="font-mono text-[9px]">{expanded ? "▲" : "▼"}</span>
-              </button>
-              <button onClick={startEdit}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:text-soft active:scale-90 transition-all"
-                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <ActionBtn onClick={() => setExpanded(x => !x)} label="Expand">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  {expanded ? <polyline points="18 15 12 9 6 15"/> : <polyline points="6 9 12 15 18 9"/>}
+                </svg>
+              </ActionBtn>
+              <ActionBtn onClick={startEdit} label="Edit">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
-              </button>
-              <button onClick={onDelete}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:text-warn active:scale-90 transition-all"
-                style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              </ActionBtn>
+              <ActionBtn onClick={onDelete} label="Delete" danger>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/>
                   <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                   <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
                 </svg>
-              </button>
+              </ActionBtn>
             </>
           )}
         </div>
@@ -367,49 +404,51 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
 
       {/* Edit panel */}
       {editing && (
-        <div className="px-4 pb-4 pt-1" style={{ borderTop:"1px solid var(--line-soft)" }}>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none mb-3">
+        <div style={{ padding: "0 16px 14px 50px", display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", gap: 6, overflowX: "auto" }} className="no-scroll">
             {RECURRENCE_OPTIONS.map(opt => (
               <button type="button" key={opt} onClick={() => setEditRec(opt)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-wide transition-all active:scale-95 ${editRec === opt ? "grad-btn text-white" : "text-muted"}`}
-                style={editRec !== opt ? { background:"var(--surface-2)", border:"1px solid var(--line)" } : {}}>
+                style={{
+                  flexShrink: 0, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+                  fontFamily: "'JetBrains Mono', monospace", cursor: "pointer", border: "1.5px solid",
+                  borderColor: editRec === opt ? "var(--accent)" : "var(--border)",
+                  backgroundColor: editRec === opt ? "var(--accent-bg)" : "var(--bg2)",
+                  color: editRec === opt ? "var(--accent-fg)" : "var(--text3)",
+                }}>
                 {RECURRENCE_LABELS[opt]}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
-            <label className="font-mono text-[10px] text-muted uppercase tracking-wider shrink-0">Due</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)" }}>Due</label>
             <input type="date" value={editDue} onChange={e => setEditDue(e.target.value)}
-              className="rounded-xl px-3 py-1.5 font-mono text-[10px] text-muted focus:outline-none"
-              style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
-              onFocus={e => e.currentTarget.style.borderColor="#7C6FCD"}
-              onBlur={e => e.currentTarget.style.borderColor="var(--line)"} />
-            {editDue && <button type="button" onClick={() => setEditDue("")} className="font-mono text-[10px] text-muted hover:text-warn transition-colors">Clear</button>}
+              className="input" style={{ width: "auto", padding: "5px 10px", fontSize: 12 }} />
+            {editDue && (
+              <button type="button" onClick={() => setEditDue("")}
+                style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 16 }}>×</button>
+            )}
           </div>
         </div>
       )}
 
       {/* Subtasks */}
       {expanded && !editing && (
-        <div className="px-4 pb-4" style={{ borderTop:"1px solid var(--line-soft)" }}>
+        <div style={{ padding: "0 16px 14px 50px", borderTop: "1px solid var(--border2)" }}>
           {task.subtasks.length > 0 && (
-            <ul className="mt-3 mb-3 flex flex-col gap-1.5">
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 2, margin: "12px 0 10px" }}>
               {task.subtasks.map(s => (
                 <SubtaskItem key={s.id} subtask={s}
-                  onToggle={c => onToggleSubtask(s.id, c)} onDelete={() => onDeleteSubtask(s.id)} />
+                  onToggle={c => onToggleSubtask(s.id, c)}
+                  onDelete={() => onDeleteSubtask(s.id)} />
               ))}
             </ul>
           )}
-          <form onSubmit={handleSubAdd} className="mt-3 flex items-center gap-2 rounded-2xl px-4 py-2.5 transition-all"
-            style={{ background:"var(--surface-2)", border:"1px solid var(--line)" }}
-            onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor="#7C6FCD"}
-            onBlurCapture={e => (e.currentTarget as HTMLElement).style.borderColor="var(--line)"}>
-            <span className="font-mono text-[11px] text-muted shrink-0">↳</span>
-            <input value={subInput} onChange={e => setSubInput(e.target.value)} placeholder="Add a subtask…"
-              className="flex-1 min-w-0 bg-transparent font-body text-[13px] text-bright placeholder:text-muted focus:outline-none"
-              maxLength={200} />
+          <form onSubmit={handleSubAdd} style={{ display: "flex", gap: 8, marginTop: task.subtasks.length > 0 ? 4 : 12 }}>
+            <input value={subInput} onChange={e => setSubInput(e.target.value)}
+              placeholder="Add subtask…" className="input"
+              style={{ fontSize: 13, padding: "7px 12px" }} maxLength={200} />
             <button type="submit" disabled={!subInput.trim()}
-              className="shrink-0 font-mono text-[10px] uppercase tracking-wide grad-text disabled:[-webkit-text-fill-color:var(--muted)] disabled:[background:none] transition-all">
+              className="btn-accent" style={{ borderRadius: 10, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
               Add
             </button>
           </form>
@@ -420,29 +459,50 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
 }
 
 function SubtaskItem({ subtask, onToggle, onDelete }: { subtask: Subtask; onToggle: (c: boolean) => void; onDelete: () => void; }) {
+  const [h, setH] = useState(false);
   return (
-    <li className="flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors"
-      style={{ background:"var(--glass)", border:"1px solid var(--line-soft)" }}>
+    <li onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: 10,
+        backgroundColor: h ? "var(--bg2)" : "transparent", transition: "background 0.12s ease" }}>
       <button onClick={() => onToggle(!subtask.completed)}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all active:scale-90"
-        style={subtask.completed
-          ? { background:"linear-gradient(135deg,#7C6FCD,#4ABFBF)", boxShadow:"0 1px 6px rgba(124,111,205,0.35)" }
-          : { border:"2px solid var(--line)", background:"transparent" }}
-        onMouseEnter={e => { if (!subtask.completed) e.currentTarget.style.borderColor="#7C6FCD"; }}
-        onMouseLeave={e => { if (!subtask.completed) e.currentTarget.style.borderColor="var(--line)"; }}>
+        style={{
+          flexShrink: 0, width: 18, height: 18, borderRadius: "50%", cursor: "pointer",
+          border: subtask.completed ? "none" : "2px solid var(--border)",
+          backgroundColor: subtask.completed ? "var(--accent)" : "transparent",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "all 0.15s ease",
+        }}>
         {subtask.completed && (
-          <svg width="8" height="6" viewBox="0 0 10 8" fill="none">
-            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg width="9" height="7" viewBox="0 0 12 10" fill="none">
+            <path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )}
       </button>
-      <span className={`flex-1 min-w-0 font-body text-[13px] break-words ${subtask.completed ? "text-muted line-through" : "text-soft"}`}>
+      <span style={{ flex: 1, fontSize: 13, color: subtask.completed ? "var(--muted)" : "var(--text2)",
+        textDecoration: subtask.completed ? "line-through" : "none", wordBreak: "break-words" }}>
         {subtask.title}
       </span>
-      <button onClick={onDelete} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted hover:text-warn active:scale-90 transition-all"
-        style={{ background:"var(--surface-2)" }}>
-        <span className="text-sm leading-none">×</span>
-      </button>
+      <button onClick={onDelete}
+        style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer",
+          fontSize: 16, lineHeight: 1, opacity: h ? 1 : 0, transition: "opacity 0.15s ease", padding: "2px 4px" }}>×</button>
     </li>
+  );
+}
+
+function ActionBtn({ children, onClick, label, danger }: { children: React.ReactNode; onClick: () => void; label: string; danger?: boolean; }) {
+  const [h, setH] = useState(false);
+  return (
+    <button onClick={onClick} aria-label={label}
+      onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{
+        width: 30, height: 30, borderRadius: 8, border: "1px solid",
+        borderColor: h && danger ? "var(--warn-bdr)" : h ? "var(--border)" : "transparent",
+        backgroundColor: h && danger ? "var(--warn-bg)" : h ? "var(--bg2)" : "transparent",
+        color: h && danger ? "var(--warn)" : h ? "var(--text)" : "var(--muted)",
+        cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+        transition: "all 0.12s ease",
+      }}>
+      {children}
+    </button>
   );
 }
