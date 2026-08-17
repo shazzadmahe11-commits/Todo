@@ -4,66 +4,66 @@
 
 /* ── Dark (default) ──────────────────────────────────────── */
 :root {
-  --bg-gradient: radial-gradient(ellipse 120% 70% at 15% -10%, rgba(124,111,205,0.25), transparent 55%),
-                 radial-gradient(ellipse 100% 60% at 100% 0%, rgba(74,191,191,0.15), transparent 50%),
-                 linear-gradient(180deg, #1a1030 0%, #0a1a1a 100%);
-  --glass:        rgba(255,255,255,0.05);
-  --glass-hover:  rgba(255,255,255,0.08);
+  --bg:           #0f0d1a;
+  --glass:        rgba(255,255,255,0.06);
+  --glass-hover:  rgba(255,255,255,0.09);
   --glass-border: rgba(255,255,255,0.10);
   --line:         rgba(255,255,255,0.08);
   --line-soft:    rgba(255,255,255,0.05);
-  --surface-2:    rgba(255,255,255,0.04);
+  --surface-2:    rgba(255,255,255,0.05);
   --muted:        rgba(255,255,255,0.30);
   --soft:         rgba(255,255,255,0.55);
   --bright:       rgba(255,255,255,0.92);
   --warn:         #E07060;
   --warn-bg:      rgba(224,112,96,0.12);
   --warn-border:  rgba(224,112,96,0.25);
-  --glow-a:       rgba(124,111,205,0.35);
-  --glow-b:       rgba(74,191,191,0.25);
-  --glow-c:       rgba(124,111,205,0.15);
-  --bg-from:      #1a1030;
 }
 
 /* ── Light ───────────────────────────────────────────────── */
 :root.light {
-  --bg-gradient: radial-gradient(ellipse 120% 70% at 15% -10%, rgba(124,111,205,0.18), transparent 55%),
-                 radial-gradient(ellipse 100% 60% at 100% 0%, rgba(74,191,191,0.12), transparent 50%),
-                 linear-gradient(180deg, #ddd4f8 0%, #c8f0f0 100%);
-  --glass:        rgba(255,255,255,0.55);
-  --glass-hover:  rgba(255,255,255,0.72);
-  --glass-border: rgba(255,255,255,0.80);
+  --bg:           #f0ecff;
+  --glass:        rgba(255,255,255,0.60);
+  --glass-hover:  rgba(255,255,255,0.75);
+  --glass-border: rgba(255,255,255,0.85);
   --line:         rgba(0,0,0,0.08);
   --line-soft:    rgba(0,0,0,0.05);
-  --surface-2:    rgba(255,255,255,0.40);
+  --surface-2:    rgba(255,255,255,0.45);
   --muted:        rgba(0,0,0,0.35);
   --soft:         rgba(0,0,0,0.55);
   --bright:       rgba(0,0,0,0.88);
   --warn:         #C0442E;
   --warn-bg:      rgba(192,68,46,0.10);
   --warn-border:  rgba(192,68,46,0.22);
-  --glow-a:       rgba(124,111,205,0.20);
-  --glow-b:       rgba(74,191,191,0.15);
-  --glow-c:       rgba(124,111,205,0.10);
-  --bg-from:      #ddd4f8;
 }
 
-/* ── Base — same pattern as your working app ─────────────── */
-html {
-  background: var(--bg-gradient);
-  background-attachment: fixed;
+/* ── Base — solid bg like YouTube, gradient is just an overlay ── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  background-color: var(--bg);
   min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  color: var(--bright);
 }
 
 body {
-  background: var(--bg-gradient);
-  background-attachment: fixed;
-  color: var(--bright);
   min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
+  position: relative;
 }
 
-/* ── Glass card ──────────────────────────────────────────── */
+/* Gradient overlaid on top of the solid bg — decorative only */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 0%, rgba(124,111,205,0.30) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 45% at 95% 100%, rgba(74,191,191,0.22) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Glass ───────────────────────────────────────────────── */
 .glass {
   background: var(--glass);
   border: 1px solid var(--glass-border);
@@ -72,7 +72,6 @@ body {
   border-radius: 1.5rem;
   transition: background 0.2s ease;
 }
-
 .glass-hover:hover { background: var(--glass-hover); }
 
 /* ── Gradient text ───────────────────────────────────────── */
