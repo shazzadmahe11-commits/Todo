@@ -13,6 +13,7 @@ export interface Database {
           recurrence: string;
           archived: boolean;
           due_date: string | null;
+          category: string;
           user_id: string | null;
           created_at: string;
         };
@@ -22,6 +23,7 @@ export interface Database {
           recurrence?: string;
           archived?: boolean;
           due_date?: string | null;
+          category?: string;
           user_id?: string | null;
           created_at?: string;
         };
@@ -31,6 +33,7 @@ export interface Database {
           recurrence?: string;
           archived?: boolean;
           due_date?: string | null;
+          category?: string;
           user_id?: string | null;
           created_at?: string;
         };
