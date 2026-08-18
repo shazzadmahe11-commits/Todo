@@ -11,6 +11,17 @@ type TaskRowDB = { id: string; title: string; recurrence: Recurrence; archived: 
 type CompletionRowDB = { task_id: string; completed_on: string; };
 type SubtaskRowDB = { id: string; task_id: string; title: string; completed: boolean; position: number; created_at: string; };
 
+// Supabase/Postgrest errors are plain objects with a `message` field, not
+// JS `Error` instances — so `e instanceof Error` misses them and hides the
+// real reason behind a generic fallback. This pulls the real message out.
+function errMsg(e: unknown, fallback: string): string {
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object" && "message" in e && typeof (e as { message?: unknown }).message === "string") {
+    return (e as { message: string }).message;
+  }
+  return fallback;
+}
+
 export default function TaskBoard() {
   const supabase = getSupabaseBrowserClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,6 +36,22 @@ export default function TaskBoard() {
   const [category, setCategory] = useState<string>("personal");
   const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const saved = localStorage.getItem("collapsedCategories");
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  function toggleCollapsed(cat: string) {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      try { localStorage.setItem("collapsedCategories", JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   async function loadTasks() {
     if (!user) return;
@@ -41,7 +68,7 @@ export default function TaskBoard() {
       const sm = new Map<string, Subtask[]>();
       for (const s of (sd ?? []) as SubtaskRowDB[]) { const l = sm.get(s.task_id) ?? []; l.push(s); sm.set(s.task_id, l); }
       setTasks(((td ?? []) as TaskRowDB[]).map(t => ({ ...t, last_completed_on: lc.get(t.id) ?? null, subtasks: sm.get(t.id) ?? [] })));
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not load."); }
+    } catch (e: unknown) { setError(errMsg(e, "Could not load.")); }
     finally { setLoading(false); }
   }
 
@@ -67,7 +94,7 @@ export default function TaskBoard() {
       if (error) throw error;
       setTitle(""); setRecurrence("none"); setCategory("personal"); setDueDate(""); setShowForm(false);
       await loadTasks();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not add."); }
+    } catch (e: unknown) { setError(errMsg(e, "Could not add.")); }
     finally { setSubmitting(false); }
   }
 
@@ -81,7 +108,7 @@ export default function TaskBoard() {
       if (ce) throw ce;
       if (task?.recurrence === "none") await db.from("tasks").update({ archived: true }).eq("id", id);
       await loadTasks();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not complete."); await loadTasks(); }
+    } catch (e: unknown) { setError(errMsg(e, "Could not complete.")); await loadTasks(); }
   }
 
   async function undoComplete(id: string) {
@@ -90,7 +117,7 @@ export default function TaskBoard() {
       await db.from("completions").delete().eq("task_id", id).eq("completed_on", todayStr());
       await db.from("tasks").update({ archived: false }).eq("id", id).eq("recurrence", "none");
       await loadTasks();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not undo."); await loadTasks(); }
+    } catch (e: unknown) { setError(errMsg(e, "Could not undo.")); await loadTasks(); }
   }
 
   async function deleteTask(id: string) {
@@ -100,7 +127,7 @@ export default function TaskBoard() {
 
   async function saveEdit(id: string, u: { title?: string; recurrence?: Recurrence; due_date?: string | null; category?: string }) {
     try { const { error } = await db.from("tasks").update(u).eq("id", id); if (error) throw error; await loadTasks(); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not save."); }
+    catch (e: unknown) { setError(errMsg(e, "Could not save.")); }
   }
 
   async function addSubtask(taskId: string, t: string) {
@@ -123,7 +150,7 @@ export default function TaskBoard() {
   async function editSubtask(id: string, title: string) {
     setTasks(prev => prev.map(t => ({ ...t, subtasks: t.subtasks.map(s => s.id === id ? { ...s, title } : s) })));
     try { await db.from("subtasks").update({ title }).eq("id", id); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not update subtask."); await loadTasks(); }
+    catch (e: unknown) { setError(errMsg(e, "Could not update subtask.")); await loadTasks(); }
   }
 
   const today = new Date();
@@ -224,9 +251,18 @@ export default function TaskBoard() {
             ) : (
               /* ── Grouped by category, each with a colored label; tasks are their own cards with gap between ── */
               <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                {pendingGroups.map(g => (
+                {pendingGroups.map(g => {
+                  const key = `pending:${g.category}`;
+                  const isCollapsed = collapsed.has(key);
+                  return (
                   <div key={g.category}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                    <button type="button" onClick={() => toggleCollapsed(key)}
+                      style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8,
+                        background: "none", border: "none", cursor: "pointer", padding: "2px 0", width: "100%" }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ flexShrink: 0, transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)", transition: "transform 0.15s ease" }}>
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
                       <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: categoryColor(g.category), flexShrink: 0 }} />
                       <span style={{ fontSize: 11, fontWeight: 700, color: categoryColor(g.category), letterSpacing: "0.04em", textTransform: "uppercase" }}>
                         {categoryLabel(g.category)}
@@ -234,21 +270,24 @@ export default function TaskBoard() {
                       <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", fontFamily: "'JetBrains Mono', monospace" }}>
                         {g.tasks.length}
                       </span>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                      {g.tasks.map(t => (
-                        <TaskItem key={t.id} task={t}
-                          onComplete={() => completeTask(t.id)}
-                          onDelete={() => deleteTask(t.id)}
-                          onSave={u => saveEdit(t.id, u)}
-                          onAddSubtask={st => addSubtask(t.id, st)}
-                          onToggleSubtask={toggleSubtask}
-                          onDeleteSubtask={deleteSubtask}
-                          onEditSubtask={editSubtask} />
-                      ))}
-                    </div>
+                    </button>
+                    {!isCollapsed && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {g.tasks.map(t => (
+                          <TaskItem key={t.id} task={t}
+                            onComplete={() => completeTask(t.id)}
+                            onDelete={() => deleteTask(t.id)}
+                            onSave={u => saveEdit(t.id, u)}
+                            onAddSubtask={st => addSubtask(t.id, st)}
+                            onToggleSubtask={toggleSubtask}
+                            onDeleteSubtask={deleteSubtask}
+                            onEditSubtask={editSubtask} />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -264,9 +303,18 @@ export default function TaskBoard() {
                 </span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 20, opacity: 0.72 }}>
-                {doneGroups.map(g => (
+                {doneGroups.map(g => {
+                  const key = `done:${g.category}`;
+                  const isCollapsed = collapsed.has(key);
+                  return (
                   <div key={g.category}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                    <button type="button" onClick={() => toggleCollapsed(key)}
+                      style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8,
+                        background: "none", border: "none", cursor: "pointer", padding: "2px 0", width: "100%" }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
+                        style={{ flexShrink: 0, transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)", transition: "transform 0.15s ease" }}>
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
                       <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: categoryColor(g.category), flexShrink: 0 }} />
                       <span style={{ fontSize: 11, fontWeight: 700, color: categoryColor(g.category), letterSpacing: "0.04em", textTransform: "uppercase" }}>
                         {categoryLabel(g.category)}
@@ -274,21 +322,24 @@ export default function TaskBoard() {
                       <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", fontFamily: "'JetBrains Mono', monospace" }}>
                         {g.tasks.length}
                       </span>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {g.tasks.map(t => (
-                        <TaskItem key={t.id} task={t} completed
-                          onUndo={() => undoComplete(t.id)}
-                          onDelete={() => deleteTask(t.id)}
-                          onSave={u => saveEdit(t.id, u)}
-                          onAddSubtask={st => addSubtask(t.id, st)}
-                          onToggleSubtask={toggleSubtask}
-                          onDeleteSubtask={deleteSubtask}
-                          onEditSubtask={editSubtask} />
-                      ))}
-                    </div>
+                    </button>
+                    {!isCollapsed && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {g.tasks.map(t => (
+                          <TaskItem key={t.id} task={t} completed
+                            onUndo={() => undoComplete(t.id)}
+                            onDelete={() => deleteTask(t.id)}
+                            onSave={u => saveEdit(t.id, u)}
+                            onAddSubtask={st => addSubtask(t.id, st)}
+                            onToggleSubtask={toggleSubtask}
+                            onDeleteSubtask={deleteSubtask}
+                            onEditSubtask={editSubtask} />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
