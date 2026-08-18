@@ -4,9 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useAuth } from "@/context/AuthContext";
 import { Task, Subtask, Recurrence, RECURRENCE_LABELS, isPending, todayStr, dueSoonLabel } from "@/lib/recurrence";
+import { PRESET_CATEGORIES, categoryColor, categoryLabel, groupTasksByCategory } from "@/lib/category";
 
 const RECURRENCE_OPTIONS: Recurrence[] = ["none", "daily", "weekly", "monthly"];
-type TaskRowDB = { id: string; title: string; recurrence: Recurrence; archived: boolean; due_date: string | null; created_at: string; };
+type TaskRowDB = { id: string; title: string; recurrence: Recurrence; archived: boolean; due_date: string | null; category: string; created_at: string; };
 type CompletionRowDB = { task_id: string; completed_on: string; };
 type SubtaskRowDB = { id: string; task_id: string; title: string; completed: boolean; position: number; created_at: string; };
 
@@ -21,6 +22,7 @@ export default function TaskBoard() {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [recurrence, setRecurrence] = useState<Recurrence>("none");
+  const [category, setCategory] = useState<string>("personal");
   const [dueDate, setDueDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -28,7 +30,7 @@ export default function TaskBoard() {
     if (!user) return;
     setLoading(true); setError(null);
     try {
-      const { data: td, error: te } = await supabase.from("tasks").select("id,title,recurrence,archived,due_date,created_at").eq("archived", false).order("created_at", { ascending: true });
+      const { data: td, error: te } = await supabase.from("tasks").select("id,title,recurrence,archived,due_date,category,created_at").eq("archived", false).order("created_at", { ascending: true });
       if (te) throw te;
       const { data: cd, error: ce } = await supabase.from("completions").select("task_id,completed_on").order("completed_on", { ascending: false });
       if (ce) throw ce;
@@ -52,15 +54,18 @@ export default function TaskBoard() {
     return { pending: p, done: d };
   }, [tasks]);
 
+  const pendingGroups = useMemo(() => groupTasksByCategory(pending), [pending]);
+  const doneGroups = useMemo(() => groupTasksByCategory(done), [done]);
+
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
     const t = title.trim();
     if (!t || submitting || !user) return;
     setSubmitting(true);
     try {
-      const { error } = await db.from("tasks").insert({ title: t, recurrence, due_date: dueDate || null, user_id: user.id });
+      const { error } = await db.from("tasks").insert({ title: t, recurrence, due_date: dueDate || null, category, user_id: user.id });
       if (error) throw error;
-      setTitle(""); setRecurrence("none"); setDueDate(""); setShowForm(false);
+      setTitle(""); setRecurrence("none"); setCategory("personal"); setDueDate(""); setShowForm(false);
       await loadTasks();
     } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not add."); }
     finally { setSubmitting(false); }
@@ -93,7 +98,7 @@ export default function TaskBoard() {
     try { await db.from("tasks").delete().eq("id", id); } catch { await loadTasks(); }
   }
 
-  async function saveEdit(id: string, u: { title?: string; recurrence?: Recurrence; due_date?: string | null }) {
+  async function saveEdit(id: string, u: { title?: string; recurrence?: Recurrence; due_date?: string | null; category?: string }) {
     try { const { error } = await db.from("tasks").update(u).eq("id", id); if (error) throw error; await loadTasks(); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not save."); }
   }
@@ -157,6 +162,10 @@ export default function TaskBoard() {
                 </button>
               ))}
             </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 6 }}>Category</label>
+              <CategoryPicker value={category} onChange={setCategory} />
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap" }}>Due</label>
@@ -168,7 +177,7 @@ export default function TaskBoard() {
                 )}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={() => { setShowForm(false); setTitle(""); setRecurrence("none"); setDueDate(""); }}
+                <button type="button" onClick={() => { setShowForm(false); setTitle(""); setRecurrence("none"); setCategory("personal"); setDueDate(""); }}
                   className="btn-ghost" style={{ borderRadius: 10, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
                   Cancel
                 </button>
@@ -213,17 +222,32 @@ export default function TaskBoard() {
                 <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Add a task to get started</p>
               </div>
             ) : (
-              /* ── Each task is its own card with gap between ── */
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {pending.map(t => (
-                  <TaskItem key={t.id} task={t}
-                    onComplete={() => completeTask(t.id)}
-                    onDelete={() => deleteTask(t.id)}
-                    onSave={u => saveEdit(t.id, u)}
-                    onAddSubtask={st => addSubtask(t.id, st)}
-                    onToggleSubtask={toggleSubtask}
-                    onDeleteSubtask={deleteSubtask}
-                    onEditSubtask={editSubtask} />
+              /* ── Grouped by category, each with a colored label; tasks are their own cards with gap between ── */
+              <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+                {pendingGroups.map(g => (
+                  <div key={g.category}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: categoryColor(g.category), flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: categoryColor(g.category), letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        {categoryLabel(g.category)}
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                        {g.tasks.length}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {g.tasks.map(t => (
+                        <TaskItem key={t.id} task={t}
+                          onComplete={() => completeTask(t.id)}
+                          onDelete={() => deleteTask(t.id)}
+                          onSave={u => saveEdit(t.id, u)}
+                          onAddSubtask={st => addSubtask(t.id, st)}
+                          onToggleSubtask={toggleSubtask}
+                          onDeleteSubtask={deleteSubtask}
+                          onEditSubtask={editSubtask} />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -239,16 +263,31 @@ export default function TaskBoard() {
                   {done.length}
                 </span>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, opacity: 0.72 }}>
-                {done.map(t => (
-                  <TaskItem key={t.id} task={t} completed
-                    onUndo={() => undoComplete(t.id)}
-                    onDelete={() => deleteTask(t.id)}
-                    onSave={u => saveEdit(t.id, u)}
-                    onAddSubtask={st => addSubtask(t.id, st)}
-                    onToggleSubtask={toggleSubtask}
-                    onDeleteSubtask={deleteSubtask}
-                    onEditSubtask={editSubtask} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 20, opacity: 0.72 }}>
+                {doneGroups.map(g => (
+                  <div key={g.category}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: categoryColor(g.category), flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: categoryColor(g.category), letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        {categoryLabel(g.category)}
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                        {g.tasks.length}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {g.tasks.map(t => (
+                        <TaskItem key={t.id} task={t} completed
+                          onUndo={() => undoComplete(t.id)}
+                          onDelete={() => deleteTask(t.id)}
+                          onSave={u => saveEdit(t.id, u)}
+                          onAddSubtask={st => addSubtask(t.id, st)}
+                          onToggleSubtask={toggleSubtask}
+                          onDeleteSubtask={deleteSubtask}
+                          onEditSubtask={editSubtask} />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
@@ -259,10 +298,52 @@ export default function TaskBoard() {
   );
 }
 
+function CategoryPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isPreset = (PRESET_CATEGORIES as readonly string[]).includes(value.toLowerCase());
+  const [customOpen, setCustomOpen] = useState(!isPreset && value.trim() !== "");
+  const [customVal, setCustomVal] = useState(isPreset ? "" : value);
+
+  useEffect(() => {
+    const preset = (PRESET_CATEGORIES as readonly string[]).includes(value.toLowerCase());
+    if (preset) { setCustomOpen(false); setCustomVal(""); }
+  }, [value]);
+
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      {PRESET_CATEGORIES.map(c => (
+        <button type="button" key={c} onClick={() => { onChange(c); setCustomOpen(false); setCustomVal(""); }}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
+            padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            border: "1.5px solid", borderColor: value.toLowerCase() === c ? categoryColor(c) : "var(--border)",
+            backgroundColor: value.toLowerCase() === c ? categoryColor(c) + "1f" : "var(--bg2)",
+            color: value.toLowerCase() === c ? categoryColor(c) : "var(--text3)", transition: "all 0.12s ease",
+          }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: categoryColor(c), flexShrink: 0 }} />
+          {categoryLabel(c)}
+        </button>
+      ))}
+      {customOpen ? (
+        <input autoFocus value={customVal}
+          onChange={e => { setCustomVal(e.target.value); onChange(e.target.value); }}
+          onBlur={() => { if (!customVal.trim()) { setCustomOpen(false); onChange("personal"); } }}
+          placeholder="Custom category…" className="input"
+          style={{ width: 150, padding: "5px 10px", fontSize: 12, flexShrink: 0 }} maxLength={40} />
+      ) : (
+        <button type="button" onClick={() => setCustomOpen(true)}
+          style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            border: "1.5px dashed var(--border)", backgroundColor: "transparent", color: "var(--text3)" }}>
+          + Custom
+        </button>
+      )}
+    </div>
+  );
+}
+
 function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask, onEditSubtask }: {
   task: Task; completed?: boolean;
   onComplete?: () => void; onUndo?: () => void; onDelete: () => void;
-  onSave: (u: { title?: string; recurrence?: Recurrence; due_date?: string | null }) => void;
+  onSave: (u: { title?: string; recurrence?: Recurrence; due_date?: string | null; category?: string }) => void;
   onAddSubtask: (t: string) => void;
   onToggleSubtask: (id: string, c: boolean) => void;
   onDeleteSubtask: (id: string) => void;
@@ -272,15 +353,16 @@ function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSav
   const [editTitle, setEditTitle] = useState(task.title);
   const [editRec, setEditRec] = useState<Recurrence>(task.recurrence);
   const [editDue, setEditDue] = useState(task.due_date ?? "");
+  const [editCategory, setEditCategory] = useState(task.category);
   const [subInput, setSubInput] = useState("");
   const [hovered, setHovered] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (editing) editRef.current?.focus(); }, [editing]);
 
-  function startEdit() { setEditTitle(task.title); setEditRec(task.recurrence); setEditDue(task.due_date ?? ""); setEditing(true); }
+  function startEdit() { setEditTitle(task.title); setEditRec(task.recurrence); setEditDue(task.due_date ?? ""); setEditCategory(task.category); setEditing(true); }
   function cancelEdit() { setEditing(false); setSubInput(""); }
-  function commitEdit() { const t = editTitle.trim(); if (!t) return; onSave({ title: t, recurrence: editRec, due_date: editDue || null }); setEditing(false); setSubInput(""); }
+  function commitEdit() { const t = editTitle.trim(); if (!t) return; onSave({ title: t, recurrence: editRec, due_date: editDue || null, category: editCategory }); setEditing(false); setSubInput(""); }
   function handleSubAdd(e: React.FormEvent) { e.preventDefault(); const t = subInput.trim(); if (!t) return; setSubInput(""); onAddSubtask(t); }
 
   const dueLabel = dueSoonLabel(task.due_date);
@@ -292,6 +374,7 @@ function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSav
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{ overflow: "hidden", transition: "box-shadow 0.15s ease",
+        borderLeft: `3px solid ${categoryColor(task.category)}`,
         boxShadow: hovered ? "0 4px 20px rgba(0,0,0,0.10)" : undefined }}>
 
       {/* Main row */}
@@ -394,6 +477,10 @@ function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSav
                 {RECURRENCE_LABELS[opt]}
               </button>
             ))}
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 6 }}>Category</label>
+            <CategoryPicker value={editCategory} onChange={setEditCategory} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)" }}>Due</label>
