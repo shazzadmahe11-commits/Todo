@@ -117,7 +117,7 @@ export default function TaskBoard() {
 
   async function editSubtask(id: string, title: string) {
     setTasks(prev => prev.map(t => ({ ...t, subtasks: t.subtasks.map(s => s.id === id ? { ...s, title } : s) })));
-    try { const { error } = await db.from("subtasks").update({ title }).eq("id", id); if (error) throw error; }
+    try { await db.from("subtasks").update({ title }).eq("id", id); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not update subtask."); await loadTasks(); }
   }
 
@@ -126,45 +126,37 @@ export default function TaskBoard() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Header */}
+      {/* Page header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.4px", lineHeight: 1.2 }}>Today</h1>
           <p style={{ fontSize: 13, color: "var(--text3)", marginTop: 3 }}>{dateStr}</p>
         </div>
-        <button onClick={() => setShowForm(s => !s)}
-          className="btn-accent"
-          style={{ borderRadius: 12, padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
+        <button onClick={() => setShowForm(s => !s)} className="btn-accent"
+          style={{ borderRadius: 12, padding: "8px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flexShrink: 0 }}>
           <span style={{ fontSize: 18, lineHeight: 1 }}>+</span> Add task
         </button>
       </div>
 
-      {/* Add form */}
+      {/* Add task form */}
       {showForm && (
         <div className="card fade-up" style={{ padding: 20 }}>
           <form onSubmit={addTask} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What needs doing?"
-              autoFocus className="input" maxLength={200}
-              style={{ fontSize: 16, fontWeight: 500 }} />
-
-            {/* Recurrence */}
+              autoFocus className="input" maxLength={200} style={{ fontSize: 16, fontWeight: 500 }} />
             <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }} className="no-scroll">
               {RECURRENCE_OPTIONS.map(opt => (
                 <button type="button" key={opt} onClick={() => setRecurrence(opt)}
-                  style={{
-                    flexShrink: 0, padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 600,
+                  style={{ flexShrink: 0, padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 600,
                     fontFamily: "'JetBrains Mono', monospace", cursor: "pointer", border: "1.5px solid",
                     borderColor: recurrence === opt ? "var(--accent)" : "var(--border)",
                     backgroundColor: recurrence === opt ? "var(--accent-bg)" : "var(--bg2)",
-                    color: recurrence === opt ? "var(--accent-fg)" : "var(--text3)",
-                    transition: "all 0.12s ease",
-                  }}>
+                    color: recurrence === opt ? "var(--accent-fg)" : "var(--text3)", transition: "all 0.12s ease" }}>
                   {RECURRENCE_LABELS[opt]}
                 </button>
               ))}
             </div>
-
-            {/* Due date + submit */}
             <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", whiteSpace: "nowrap" }}>Due</label>
@@ -202,21 +194,18 @@ export default function TaskBoard() {
           <div style={{ width: 24, height: 24, borderRadius: "50%", border: "2.5px solid var(--border)", borderTopColor: "var(--accent)" }} className="spin" />
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          {/* Pending tasks */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+          {/* Pending */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                To do
-              </span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", letterSpacing: "0.06em", textTransform: "uppercase" }}>To do</span>
               {pending.length > 0 && (
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--accent-fg)", backgroundColor: "var(--accent-bg)",
+                <span style={{ fontSize: 10, fontWeight: 700, color: "var(--accent-fg)", backgroundColor: "var(--accent-bg)",
                   border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
                   {pending.length}
                 </span>
               )}
             </div>
-
             {pending.length === 0 ? (
               <div className="card" style={{ padding: "40px 24px", textAlign: "center" }}>
                 <div style={{ fontSize: 32, marginBottom: 10 }}>🌿</div>
@@ -224,9 +213,10 @@ export default function TaskBoard() {
                 <p style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Add a task to get started</p>
               </div>
             ) : (
-              <div className="card" style={{ overflow: "hidden" }}>
-                {pending.map((t, i) => (
-                  <TaskItem key={t.id} task={t} isLast={i === pending.length - 1}
+              /* ── Each task is its own card with gap between ── */
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {pending.map(t => (
+                  <TaskItem key={t.id} task={t}
                     onComplete={() => completeTask(t.id)}
                     onDelete={() => deleteTask(t.id)}
                     onSave={u => saveEdit(t.id, u)}
@@ -239,22 +229,19 @@ export default function TaskBoard() {
             )}
           </div>
 
-          {/* Done tasks */}
+          {/* Done */}
           {done.length > 0 && (
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text3)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                  Completed
-                </span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)",
-                  backgroundColor: "var(--bg2)", border: "1px solid var(--border)",
-                  borderRadius: 999, padding: "1px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text3)", letterSpacing: "0.06em", textTransform: "uppercase" }}>Completed</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", backgroundColor: "var(--bg2)",
+                  border: "1px solid var(--border)", borderRadius: 999, padding: "1px 8px", fontFamily: "'JetBrains Mono', monospace" }}>
                   {done.length}
                 </span>
               </div>
-              <div className="card" style={{ overflow: "hidden", opacity: 0.75 }}>
-                {done.map((t, i) => (
-                  <TaskItem key={t.id} task={t} completed isLast={i === done.length - 1}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, opacity: 0.72 }}>
+                {done.map(t => (
+                  <TaskItem key={t.id} task={t} completed
                     onUndo={() => undoComplete(t.id)}
                     onDelete={() => deleteTask(t.id)}
                     onSave={u => saveEdit(t.id, u)}
@@ -272,8 +259,8 @@ export default function TaskBoard() {
   );
 }
 
-function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask, onEditSubtask }: {
-  task: Task; completed?: boolean; isLast: boolean;
+function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask, onEditSubtask }: {
+  task: Task; completed?: boolean;
   onComplete?: () => void; onUndo?: () => void; onDelete: () => void;
   onSave: (u: { title?: string; recurrence?: Recurrence; due_date?: string | null }) => void;
   onAddSubtask: (t: string) => void;
@@ -294,37 +281,29 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
   function startEdit() { setEditTitle(task.title); setEditRec(task.recurrence); setEditDue(task.due_date ?? ""); setEditing(true); }
   function cancelEdit() { setEditing(false); setSubInput(""); }
   function commitEdit() { const t = editTitle.trim(); if (!t) return; onSave({ title: t, recurrence: editRec, due_date: editDue || null }); setEditing(false); setSubInput(""); }
-  function handleSubAdd(e: React.FormEvent) {
-    e.preventDefault();
-    const t = subInput.trim();
-    if (!t) return;
-    setSubInput(""); onAddSubtask(t);
-  }
+  function handleSubAdd(e: React.FormEvent) { e.preventDefault(); const t = subInput.trim(); if (!t) return; setSubInput(""); onAddSubtask(t); }
 
   const dueLabel = dueSoonLabel(task.due_date);
   const isOverdue = dueLabel === "Overdue";
   const doneCount = task.subtasks.filter(s => s.completed).length;
 
   return (
-    <div
+    <div className="card"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{ borderBottom: isLast ? "none" : "1px solid var(--border2)", transition: "background 0.12s ease",
-        backgroundColor: hovered && !editing ? "var(--bg2)" : "transparent" }}>
+      style={{ overflow: "hidden", transition: "box-shadow 0.15s ease",
+        boxShadow: hovered ? "0 4px 20px rgba(0,0,0,0.10)" : undefined }}>
 
       {/* Main row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 16px" }}>
         {/* Checkbox */}
         <button onClick={completed ? onUndo : onComplete}
-          style={{
-            flexShrink: 0, marginTop: 2,
-            width: 22, height: 22, borderRadius: "50%", cursor: "pointer",
+          style={{ flexShrink: 0, marginTop: 2, width: 22, height: 22, borderRadius: "50%", cursor: "pointer",
             border: completed ? "none" : "2px solid var(--border)",
             backgroundColor: completed ? "var(--accent)" : "transparent",
             display: "flex", alignItems: "center", justifyContent: "center",
             transition: "all 0.15s ease",
-            boxShadow: completed ? "0 2px 8px rgba(34,197,94,0.30)" : "none",
-          }}
+            boxShadow: completed ? "0 2px 8px rgba(34,197,94,0.30)" : "none" }}
           onMouseEnter={e => { if (!completed) { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent)"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "var(--accent-bg)"; } }}
           onMouseLeave={e => { if (!completed) { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; } }}>
           {completed && (
@@ -339,24 +318,21 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
           {editing ? (
             <input ref={editRef} value={editTitle} onChange={e => setEditTitle(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
-              className="input" maxLength={200}
-              style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }} />
+              className="input" maxLength={200} style={{ fontSize: 15, fontWeight: 500 }} />
           ) : (
-            <span style={{
-              display: "block", fontSize: 15, fontWeight: 500, lineHeight: 1.4,
+            <span style={{ display: "block", fontSize: 15, fontWeight: 500, lineHeight: 1.4,
               color: completed ? "var(--muted)" : "var(--text)",
-              textDecoration: completed ? "line-through" : "none",
-              wordBreak: "break-word",
-            }}>
+              textDecoration: completed ? "line-through" : "none", wordBreak: "break-word" }}>
               {task.title}
             </span>
           )}
 
           {/* Badges */}
           {!editing && (dueLabel || task.recurrence !== "none" || task.subtasks.length > 0) && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 7 }}>
               {dueLabel && (
-                <span className={isOverdue ? "pill pill-warn" : "pill"} style={!isOverdue ? { color: "var(--text3)", backgroundColor: "var(--bg2)" } : {}}>
+                <span className={isOverdue ? "pill pill-warn" : "pill"}
+                  style={!isOverdue ? { color: "var(--text3)", backgroundColor: "var(--bg2)" } : {}}>
                   {isOverdue ? "⚠ " : "📅 "}{dueLabel}
                 </span>
               )}
@@ -374,18 +350,14 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
           )}
         </div>
 
-        {/* Action buttons */}
+        {/* Actions */}
         <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
           {editing ? (
             <>
-              <button onClick={commitEdit}
-                className="btn-accent" style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                Save
-              </button>
-              <button onClick={cancelEdit}
-                className="btn-ghost" style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                Cancel
-              </button>
+              <button onClick={commitEdit} className="btn-accent"
+                style={{ borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Save</button>
+              <button onClick={cancelEdit} className="btn-ghost"
+                style={{ borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
             </>
           ) : (
             <>
@@ -409,17 +381,16 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
 
       {/* Edit panel */}
       {editing && (
-        <div style={{ padding: "0 16px 14px 50px", display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", gap: 6, overflowX: "auto" }} className="no-scroll">
+        <div style={{ padding: "0 16px 14px 50px", display: "flex", flexDirection: "column", gap: 10,
+          borderTop: "1px solid var(--border2)" }}>
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingTop: 12 }} className="no-scroll">
             {RECURRENCE_OPTIONS.map(opt => (
               <button type="button" key={opt} onClick={() => setEditRec(opt)}
-                style={{
-                  flexShrink: 0, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600,
+                style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600,
                   fontFamily: "'JetBrains Mono', monospace", cursor: "pointer", border: "1.5px solid",
                   borderColor: editRec === opt ? "var(--accent)" : "var(--border)",
                   backgroundColor: editRec === opt ? "var(--accent-bg)" : "var(--bg2)",
-                  color: editRec === opt ? "var(--accent-fg)" : "var(--text3)",
-                }}>
+                  color: editRec === opt ? "var(--accent-fg)" : "var(--text3)" }}>
                 {RECURRENCE_LABELS[opt]}
               </button>
             ))}
@@ -433,16 +404,14 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
                 style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 16 }}>×</button>
             )}
           </div>
-
-          {/* Add subtask — only reachable while editing the task */}
           <div style={{ paddingTop: 8, borderTop: "1px solid var(--border2)" }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 6 }}>Add subtask</label>
             <form onSubmit={handleSubAdd} style={{ display: "flex", gap: 8 }}>
               <input value={subInput} onChange={e => setSubInput(e.target.value)}
                 placeholder="Subtask title…" className="input"
                 style={{ fontSize: 13, padding: "7px 12px" }} maxLength={200} />
-              <button type="submit" disabled={!subInput.trim()}
-                className="btn-accent" style={{ borderRadius: 10, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
+              <button type="submit" disabled={!subInput.trim()} className="btn-accent"
+                style={{ borderRadius: 10, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Add
               </button>
             </form>
@@ -450,10 +419,10 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
         </div>
       )}
 
-      {/* Subtasks — always visible alongside the task, each row clearly separated */}
+      {/* Subtasks */}
       {task.subtasks.length > 0 && (
-        <div style={{ padding: "0 16px 14px 50px", borderTop: editing ? "none" : "1px solid var(--border2)" }}>
-          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", margin: "10px 0 0" }}>
+        <div style={{ borderTop: "1px solid var(--border2)", padding: "8px 16px 12px 50px" }}>
+          <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 2 }}>
             {task.subtasks.map((s, i) => (
               <SubtaskItem key={s.id} subtask={s} isLast={i === task.subtasks.length - 1}
                 onToggle={c => onToggleSubtask(s.id, c)}
@@ -468,58 +437,47 @@ function TaskItem({ task, completed = false, isLast, onComplete, onUndo, onDelet
 }
 
 function SubtaskItem({ subtask, isLast, onToggle, onDelete, onEdit }: {
-  subtask: Subtask; isLast: boolean; onToggle: (c: boolean) => void; onDelete: () => void; onEdit: (title: string) => void;
+  subtask: Subtask; isLast: boolean;
+  onToggle: (c: boolean) => void; onDelete: () => void; onEdit: (title: string) => void;
 }) {
   const [h, setH] = useState(false);
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(subtask.title);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Guards against the input's blur (fired as it unmounts) re-triggering
-  // commit() a second time right after Enter or Escape already handled it.
   const settledRef = useRef(false);
 
   useEffect(() => { if (editing) { inputRef.current?.focus(); inputRef.current?.select(); settledRef.current = false; } }, [editing]);
   useEffect(() => { if (!editing) setVal(subtask.title); }, [subtask.title, editing]);
 
   function commit() {
-    if (settledRef.current) return;
-    settledRef.current = true;
+    if (settledRef.current) return; settledRef.current = true;
     const t = val.trim();
-    if (t && t !== subtask.title) onEdit(t);
-    else setVal(subtask.title);
+    if (t && t !== subtask.title) onEdit(t); else setVal(subtask.title);
     setEditing(false);
   }
-  function cancel() {
-    settledRef.current = true;
-    setVal(subtask.title);
-    setEditing(false);
-  }
+  function cancel() { settledRef.current = true; setVal(subtask.title); setEditing(false); }
 
   return (
     <li onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 10px",
+      style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 8px", borderRadius: 8,
         borderBottom: isLast ? "none" : "1px solid var(--border2)",
         backgroundColor: h || editing ? "var(--bg2)" : "transparent", transition: "background 0.12s ease" }}>
-      <button onClick={() => onToggle(!subtask.completed)} aria-label={subtask.completed ? "Mark incomplete" : "Mark complete"}
-        style={{
-          flexShrink: 0, width: 18, height: 18, borderRadius: "50%", cursor: "pointer",
+      <button onClick={() => onToggle(!subtask.completed)}
+        style={{ flexShrink: 0, width: 17, height: 17, borderRadius: "50%", cursor: "pointer",
           border: subtask.completed ? "none" : "2px solid var(--border)",
           backgroundColor: subtask.completed ? "var(--accent)" : "transparent",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "all 0.15s ease",
-        }}>
+          display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}>
         {subtask.completed && (
-          <svg width="9" height="7" viewBox="0 0 12 10" fill="none">
+          <svg width="8" height="7" viewBox="0 0 12 10" fill="none">
             <path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         )}
       </button>
-
       {editing ? (
         <input ref={inputRef} value={val} onChange={e => setVal(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") cancel(); }}
           onBlur={commit} maxLength={200}
-          className="input" style={{ flex: 1, fontSize: 13, padding: "4px 8px" }} />
+          className="input" style={{ flex: 1, fontSize: 13, padding: "3px 8px" }} />
       ) : (
         <span onDoubleClick={() => setEditing(true)}
           style={{ flex: 1, fontSize: 13, color: subtask.completed ? "var(--muted)" : "var(--text2)",
@@ -527,16 +485,15 @@ function SubtaskItem({ subtask, isLast, onToggle, onDelete, onEdit }: {
           {subtask.title}
         </span>
       )}
-
       {!editing && (
-        <div style={{ display: "flex", alignItems: "center", gap: 2, opacity: h ? 1 : 0, transition: "opacity 0.15s ease" }}>
-          <ActionBtn onClick={() => setEditing(true)} label="Edit subtask" size={24}>
+        <div style={{ display: "flex", gap: 2, opacity: h ? 1 : 0, transition: "opacity 0.15s ease" }}>
+          <ActionBtn onClick={() => setEditing(true)} label="Edit" size={24}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </ActionBtn>
-          <ActionBtn onClick={onDelete} label="Delete subtask" danger size={24}>
+          <ActionBtn onClick={onDelete} label="Delete" danger size={24}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6"/>
               <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -549,19 +506,19 @@ function SubtaskItem({ subtask, isLast, onToggle, onDelete, onEdit }: {
   );
 }
 
-function ActionBtn({ children, onClick, label, danger, size = 30 }: { children: React.ReactNode; onClick: () => void; label: string; danger?: boolean; size?: number; }) {
+function ActionBtn({ children, onClick, label, danger, size = 30 }: {
+  children: React.ReactNode; onClick: () => void; label: string; danger?: boolean; size?: number;
+}) {
   const [h, setH] = useState(false);
   return (
     <button onClick={onClick} aria-label={label} title={label}
       onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
-      style={{
-        width: size, height: size, borderRadius: 8, border: "1px solid", flexShrink: 0,
+      style={{ width: size, height: size, borderRadius: 8, border: "1px solid", flexShrink: 0,
         borderColor: h && danger ? "var(--warn-bdr)" : h ? "var(--border)" : "transparent",
         backgroundColor: h && danger ? "var(--warn-bg)" : h ? "var(--bg2)" : "transparent",
         color: h && danger ? "var(--warn)" : h ? "var(--text)" : "var(--muted)",
         cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-        transition: "all 0.12s ease",
-      }}>
+        transition: "all 0.12s ease" }}>
       {children}
     </button>
   );
