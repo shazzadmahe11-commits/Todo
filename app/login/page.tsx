@@ -52,7 +52,7 @@ export default function LoginPage() {
             </svg>
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: "var(--text)", letterSpacing: "-0.5px", lineHeight: 1 }}>
-            Kamla.
+            Kamla.com
           </h1>
           <p style={{ fontSize: 14, color: "var(--text3)", marginTop: 6 }}>
             {mode === "signin" ? "Sign in to your account" : "Create your account"}
