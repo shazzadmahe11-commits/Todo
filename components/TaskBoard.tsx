@@ -144,7 +144,7 @@ export default function TaskBoard() {
         <div className="card fade-up" style={{ padding: 20 }}>
           <form onSubmit={addTask} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="What needs doing?"
-              autoFocus className="input" maxLength={200} style={{ fontSize: 16, fontWeight: 500 }} />
+              autoFocus className="input" maxLength={200} style={{ fontSize: 14, fontWeight: 500 }} />
             <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }} className="no-scroll">
               {RECURRENCE_OPTIONS.map(opt => (
                 <button type="button" key={opt} onClick={() => setRecurrence(opt)}
@@ -318,9 +318,9 @@ function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSav
           {editing ? (
             <input ref={editRef} value={editTitle} onChange={e => setEditTitle(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
-              className="input" maxLength={200} style={{ fontSize: 15, fontWeight: 500 }} />
+              className="input" maxLength={200} style={{ fontSize: 13, fontWeight: 500 }} />
           ) : (
-            <span style={{ display: "block", fontSize: 15, fontWeight: 500, lineHeight: 1.4,
+            <span style={{ display: "block", fontSize: 13, fontWeight: 500, lineHeight: 1.4,
               color: completed ? "var(--muted)" : "var(--text)",
               textDecoration: completed ? "line-through" : "none", wordBreak: "break-word" }}>
               {task.title}
