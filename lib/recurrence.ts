@@ -15,6 +15,7 @@ export interface Task {
   recurrence: Recurrence;
   archived: boolean;
   due_date: string | null;
+  category: string;
   created_at: string;
   last_completed_on: string | null;
   subtasks: Subtask[];
