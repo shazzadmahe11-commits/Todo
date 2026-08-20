@@ -60,6 +60,16 @@ html, body {
 
 body { min-height: 100vh; }
 
+@media (min-width: 900px) {
+  body {
+    background-image:
+      radial-gradient(900px circle at 12% -10%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+      radial-gradient(800px circle at 100% 0%, color-mix(in srgb, var(--accent2) 7%, transparent), transparent 55%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+}
+
 /* ── Card ────────────────────────────────────────────── */
 .card {
   background: var(--surface);
