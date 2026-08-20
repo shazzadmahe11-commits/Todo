@@ -402,92 +402,103 @@ function HabitRow({ habit, dates, done, streak, dots, isExpanded, onToggleExpand
       style={{ overflow:"hidden", borderLeft:`3px solid ${habit.color}`, transition:"box-shadow 0.15s ease",
         boxShadow: hovered ? "0 4px 20px rgba(0,0,0,0.10)" : undefined }}>
 
-      {/* Main row */}
-      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px" }}>
-        {/* Complete toggle */}
-        <button onClick={onToggleToday}
-          style={{ flexShrink:0, width:36, height:36, borderRadius:"50%", cursor:"pointer",
-            border: done ? "none" : `2px solid ${habit.color}66`,
-            backgroundColor: done ? habit.color : "transparent",
-            boxShadow: done ? `0 2px 10px ${habit.color}50` : "none",
-            transition:"all 0.15s ease",
-            display:"flex", alignItems:"center", justifyContent:"center" }}
-          onMouseEnter={e => { if (!done) { (e.currentTarget as HTMLButtonElement).style.backgroundColor = habit.color + "1a"; (e.currentTarget as HTMLButtonElement).style.borderColor = habit.color; } }}
-          onMouseLeave={e => { if (!done) { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; (e.currentTarget as HTMLButtonElement).style.borderColor = habit.color + "66"; } }}
-          title={done ? "Mark incomplete" : "Mark done"} aria-label={done ? "Mark incomplete" : "Mark done"}>
-          {done
-            ? <svg width="16" height="13" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            : <span style={{ fontSize:16 }}>{habitEmoji(habit.icon)}</span>
-          }
-        </button>
+      <div style={{ padding:"14px 16px", display:"flex", flexDirection:"column", gap:12 }}>
+        {/* Top row: icon badge + name/badges + actions */}
+        <div style={{ display:"flex", alignItems:"flex-start", gap:12 }}>
+          <div style={{ flexShrink:0, width:34, height:34, borderRadius:9, marginTop:1,
+            backgroundColor: habit.color+"1f", display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>
+            {habitEmoji(habit.icon)}
+          </div>
 
-        {/* Info */}
-        <div style={{ flex:1, minWidth:0 }}>
-          {editing ? (
-            <input ref={editRef} value={editName} onChange={e => setEditName(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
-              className="input" maxLength={80} style={{ fontSize:14, fontWeight:600 }} />
-          ) : (
-            <>
-              <div style={{ fontSize:14, fontWeight:600, color:"var(--text)", marginBottom:3 }}>{habit.name}</div>
-              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                {streak > 0 && (
-                  <span style={{ fontSize:12, fontWeight:700, color:"#f59e0b", display:"flex", alignItems:"center", gap:3 }}>
-                    🔥 {streak} {habit.frequency === "daily" ? "day" : habit.frequency === "weekly" ? "week" : "month"}{streak !== 1 ? "s" : ""}
+          <div style={{ flex:1, minWidth:0 }}>
+            {editing ? (
+              <input ref={editRef} value={editName} onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
+                className="input" maxLength={80} style={{ fontSize:14, fontWeight:600 }} />
+            ) : (
+              <>
+                <div style={{ fontSize:14, fontWeight:600, color:"var(--text)", marginBottom:3 }}>{habit.name}</div>
+                <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                  {streak > 0 && (
+                    <span style={{ fontSize:12, fontWeight:700, color:"#f59e0b", display:"flex", alignItems:"center", gap:3 }}>
+                      🔥 {streak} {habit.frequency === "daily" ? "day" : habit.frequency === "weekly" ? "week" : "month"}{streak !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"'JetBrains Mono', monospace" }}>
+                    {habit.frequency}
                   </span>
-                )}
-                <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"'JetBrains Mono', monospace" }}>
-                  {habit.frequency} {done ? "· ✓ done" : "· pending"}
-                </span>
-              </div>
-            </>
-          )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0 }}>
+            {editing ? (
+              <>
+                <button onClick={commitEdit} className="btn-accent"
+                  style={{ borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:700, cursor:"pointer" }}>Save</button>
+                <button onClick={cancelEdit} className="btn-ghost"
+                  style={{ borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:600, cursor:"pointer" }}>Cancel</button>
+              </>
+            ) : (
+              <>
+                <ActionBtn onClick={onToggleExpand} label={isExpanded ? "Collapse" : "Expand"}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition:"transform 0.15s ease" }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </ActionBtn>
+                <ActionBtn onClick={startEdit} label="Edit">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </ActionBtn>
+                <ActionBtn onClick={onDelete} label="Delete" danger>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                    <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+                  </svg>
+                </ActionBtn>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* 7-dot history */}
+        {/* Bottom row: unmistakable "mark done" button + history dots */}
         {!editing && (
-          <div style={{ display:"flex", gap:4, flexShrink:0 }}>
-            {dots.map((filled, i) => (
-              <div key={i} style={{ width:8, height:8, borderRadius:"50%",
-                backgroundColor: filled ? habit.color : "var(--border)",
-                opacity: filled ? 1 : 0.4 }} />
-            ))}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, flexWrap:"wrap" }}>
+            <button onClick={onToggleToday}
+              style={{ flexShrink:0, display:"flex", alignItems:"center", gap:7, cursor:"pointer",
+                border: done ? "none" : `1.5px solid ${habit.color}70`,
+                backgroundColor: done ? habit.color : "transparent",
+                color: done ? "#fff" : habit.color,
+                borderRadius:999, padding:"7px 14px 7px 10px",
+                fontSize:13, fontWeight:700, fontFamily:"'Plus Jakarta Sans', sans-serif",
+                boxShadow: done ? `0 2px 10px ${habit.color}50` : "none",
+                transition:"all 0.15s ease" }}
+              onMouseEnter={e => { if (!done) (e.currentTarget as HTMLButtonElement).style.backgroundColor = habit.color + "1a"; }}
+              onMouseLeave={e => { if (!done) (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; }}
+              title={done ? "Mark as not done" : "Mark as done"} aria-label={done ? "Mark as not done" : "Mark as done"}>
+              <span style={{ width:18, height:18, borderRadius:"50%", flexShrink:0,
+                border: done ? "none" : `1.5px solid ${habit.color}`,
+                backgroundColor: done ? "rgba(255,255,255,0.25)" : "transparent",
+                display:"flex", alignItems:"center", justifyContent:"center" }}>
+                {done && <svg width="10" height="8" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+              </span>
+              {done ? "Done today" : "Mark as done"}
+            </button>
+
+            <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+              {dots.map((filled, i) => (
+                <div key={i} style={{ width:8, height:8, borderRadius:"50%",
+                  backgroundColor: filled ? habit.color : "var(--border)",
+                  opacity: filled ? 1 : 0.4 }} />
+              ))}
+            </div>
           </div>
         )}
-
-        {/* Actions */}
-        <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0 }}>
-          {editing ? (
-            <>
-              <button onClick={commitEdit} className="btn-accent"
-                style={{ borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:700, cursor:"pointer" }}>Save</button>
-              <button onClick={cancelEdit} className="btn-ghost"
-                style={{ borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:600, cursor:"pointer" }}>Cancel</button>
-            </>
-          ) : (
-            <>
-              <ActionBtn onClick={onToggleExpand} label={isExpanded ? "Collapse" : "Expand"}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition:"transform 0.15s ease" }}>
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </ActionBtn>
-              <ActionBtn onClick={startEdit} label="Edit">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-              </ActionBtn>
-              <ActionBtn onClick={onDelete} label="Delete" danger>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
-                </svg>
-              </ActionBtn>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Edit panel */}
