@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 const LIGHT_BG = "#f5faf6";
-const DARK_BG  = "#1a1e1c";
+const DARK_BG  = "#0e1013";
 
 function applyTheme(t: "light" | "dark") {
   document.documentElement.classList.toggle("dark", t === "dark");
