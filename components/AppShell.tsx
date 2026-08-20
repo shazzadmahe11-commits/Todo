@@ -54,8 +54,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         backdropFilter: "blur(12px)",
         overflowX: "hidden",
       }}>
-        <div className="shell-header-inner" style={{
-          maxWidth: 680, margin: "0 auto",
+        <div className="shell-header-inner shell-width" style={{
+          margin: "0 auto",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           gap: 8,
         }}>
@@ -102,11 +102,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main content */}
-      <main style={{ flex: 1, maxWidth: 680, margin: "0 auto", width: "100%", padding: "24px 16px 80px" }}>
+      <main className="shell-width" style={{ flex: 1, margin: "0 auto", width: "100%", padding: "24px 16px 80px" }}>
         <div className="fade-up">{children}</div>
       </main>
 
       <style jsx>{`
+        .shell-width {
+          max-width: 680px;
+        }
+        @media (min-width: 900px) {
+          .shell-width {
+            max-width: 760px;
+          }
+        }
+        @media (min-width: 1200px) {
+          .shell-width {
+            max-width: 880px;
+          }
+        }
         .shell-header-inner {
           padding: 0 16px;
           height: 56px;
