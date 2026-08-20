@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useAuth } from "@/context/AuthContext";
 
@@ -215,6 +215,12 @@ export default function HabitBoard() {
     await db.from("habits").delete().eq("id", id);
   }
 
+  async function editHabit(id: string, u: { name?: string; color?: string; icon?: string; frequency?: Habit["frequency"] }) {
+    setHabits(prev => prev.map(h => h.id === id ? { ...h, ...u } : h));
+    try { const { error } = await db.from("habits").update(u).eq("id", id); if (error) throw error; }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not save."); await loadAll(); }
+  }
+
   const today = new Date();
   const dateStr = today.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" });
   const doneCount = habits.filter(h => isDoneToday(completionMap.get(h.id) ?? new Set(), h.frequency)).length;
@@ -346,78 +352,221 @@ export default function HabitBoard() {
             const isExpanded = expandedHabit === habit.id;
 
             return (
-              <div key={habit.id} className="card"
-                style={{ overflow:"hidden", borderLeft:`3px solid ${habit.color}` }}>
-                {/* Main row */}
-                <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px" }}>
-                  {/* Check button */}
-                  <button onClick={() => toggleToday(habit)}
-                    style={{ flexShrink:0, width:38, height:38, borderRadius:"50%", cursor:"pointer",
-                      border:"none", fontSize:18,
-                      backgroundColor: done ? habit.color : "var(--bg2)",
-                      boxShadow: done ? `0 2px 10px ${habit.color}50` : "none",
-                      transition:"all 0.15s ease",
-                      display:"flex", alignItems:"center", justifyContent:"center" }}
-                    title={done ? "Mark incomplete" : "Mark done"}>
-                    {done
-                      ? <svg width="18" height="15" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      : <span style={{ fontSize:18 }}>{habitEmoji(habit.icon)}</span>
-                    }
-                  </button>
-
-                  {/* Info */}
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:14, fontWeight:600, color:"var(--text)", marginBottom:3 }}>{habit.name}</div>
-                    <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-                      {streak > 0 && (
-                        <span style={{ fontSize:12, fontWeight:700, color:"#f59e0b", display:"flex", alignItems:"center", gap:3 }}>
-                          🔥 {streak} {habit.frequency === "daily" ? "day" : habit.frequency === "weekly" ? "week" : "month"}{streak !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                      <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"'JetBrains Mono', monospace" }}>
-                        {habit.frequency} {done ? "· ✓ done" : "· pending"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* 7-dot history */}
-                  <div style={{ display:"flex", gap:4, flexShrink:0 }}>
-                    {dots.map((filled, i) => (
-                      <div key={i} style={{ width:8, height:8, borderRadius:"50%",
-                        backgroundColor: filled ? habit.color : "var(--border)",
-                        opacity: filled ? 1 : 0.4 }} />
-                    ))}
-                  </div>
-
-                  {/* Expand / delete */}
-                  <div style={{ display:"flex", gap:4, flexShrink:0 }}>
-                    <button onClick={() => setExpandedHabit(isExpanded ? null : habit.id)}
-                      style={{ width:28, height:28, borderRadius:7, border:"none",
-                        backgroundColor:"var(--bg2)", color:"var(--text3)", cursor:"pointer",
-                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:11 }}>
-                      {isExpanded ? "▲" : "▼"}
-                    </button>
-                    <button onClick={() => deleteHabit(habit.id)}
-                      style={{ width:28, height:28, borderRadius:7, border:"none",
-                        backgroundColor:"var(--bg2)", color:"var(--muted)", cursor:"pointer",
-                        display:"flex", alignItems:"center", justifyContent:"center", fontSize:14 }}>
-                      ×
-                    </button>
-                  </div>
-                </div>
-
-                {/* Expanded: simple month view */}
-                {isExpanded && (
-                  <div style={{ borderTop:"1px solid var(--border2)", padding:"16px" }}>
-                    <MonthView habit={habit} dates={dates} />
-                  </div>
-                )}
-              </div>
+              <HabitRow key={habit.id}
+                habit={habit} dates={dates} done={done} streak={streak} dots={dots}
+                isExpanded={isExpanded}
+                onToggleExpand={() => setExpandedHabit(isExpanded ? null : habit.id)}
+                onToggleToday={() => toggleToday(habit)}
+                onDelete={() => deleteHabit(habit.id)}
+                onSave={u => editHabit(habit.id, u)} />
             );
           })}
         </div>
       )}
     </div>
+  );
+}
+
+// ── HabitRow ────────────────────────────────────────────────────────────────
+function HabitRow({ habit, dates, done, streak, dots, isExpanded, onToggleExpand, onToggleToday, onDelete, onSave }: {
+  habit: Habit; dates: Set<string>; done: boolean; streak: number; dots: boolean[]; isExpanded: boolean;
+  onToggleExpand: () => void; onToggleToday: () => void; onDelete: () => void;
+  onSave: (u: { name?: string; color?: string; icon?: string; frequency?: Habit["frequency"] }) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(habit.name);
+  const [editColor, setEditColor] = useState(habit.color);
+  const [editIcon, setEditIcon] = useState(habit.icon);
+  const [editFreq, setEditFreq] = useState<Habit["frequency"]>(habit.frequency);
+  const editRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (editing) editRef.current?.focus(); }, [editing]);
+
+  function startEdit() {
+    setEditName(habit.name); setEditColor(habit.color); setEditIcon(habit.icon); setEditFreq(habit.frequency);
+    setEditing(true);
+  }
+  function cancelEdit() { setEditing(false); }
+  function commitEdit() {
+    const n = editName.trim();
+    if (!n) return;
+    onSave({ name: n, color: editColor, icon: editIcon, frequency: editFreq });
+    setEditing(false);
+  }
+
+  return (
+    <div className="card"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ overflow:"hidden", borderLeft:`3px solid ${habit.color}`, transition:"box-shadow 0.15s ease",
+        boxShadow: hovered ? "0 4px 20px rgba(0,0,0,0.10)" : undefined }}>
+
+      {/* Main row */}
+      <div style={{ display:"flex", alignItems:"center", gap:12, padding:"14px 16px" }}>
+        {/* Complete toggle */}
+        <button onClick={onToggleToday}
+          style={{ flexShrink:0, width:36, height:36, borderRadius:"50%", cursor:"pointer",
+            border: done ? "none" : `2px solid ${habit.color}66`,
+            backgroundColor: done ? habit.color : "transparent",
+            boxShadow: done ? `0 2px 10px ${habit.color}50` : "none",
+            transition:"all 0.15s ease",
+            display:"flex", alignItems:"center", justifyContent:"center" }}
+          onMouseEnter={e => { if (!done) { (e.currentTarget as HTMLButtonElement).style.backgroundColor = habit.color + "1a"; (e.currentTarget as HTMLButtonElement).style.borderColor = habit.color; } }}
+          onMouseLeave={e => { if (!done) { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "transparent"; (e.currentTarget as HTMLButtonElement).style.borderColor = habit.color + "66"; } }}
+          title={done ? "Mark incomplete" : "Mark done"} aria-label={done ? "Mark incomplete" : "Mark done"}>
+          {done
+            ? <svg width="16" height="13" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            : <span style={{ fontSize:16 }}>{habitEmoji(habit.icon)}</span>
+          }
+        </button>
+
+        {/* Info */}
+        <div style={{ flex:1, minWidth:0 }}>
+          {editing ? (
+            <input ref={editRef} value={editName} onChange={e => setEditName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") cancelEdit(); }}
+              className="input" maxLength={80} style={{ fontSize:14, fontWeight:600 }} />
+          ) : (
+            <>
+              <div style={{ fontSize:14, fontWeight:600, color:"var(--text)", marginBottom:3 }}>{habit.name}</div>
+              <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                {streak > 0 && (
+                  <span style={{ fontSize:12, fontWeight:700, color:"#f59e0b", display:"flex", alignItems:"center", gap:3 }}>
+                    🔥 {streak} {habit.frequency === "daily" ? "day" : habit.frequency === "weekly" ? "week" : "month"}{streak !== 1 ? "s" : ""}
+                  </span>
+                )}
+                <span style={{ fontSize:11, color:"var(--text3)", fontFamily:"'JetBrains Mono', monospace" }}>
+                  {habit.frequency} {done ? "· ✓ done" : "· pending"}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 7-dot history */}
+        {!editing && (
+          <div style={{ display:"flex", gap:4, flexShrink:0 }}>
+            {dots.map((filled, i) => (
+              <div key={i} style={{ width:8, height:8, borderRadius:"50%",
+                backgroundColor: filled ? habit.color : "var(--border)",
+                opacity: filled ? 1 : 0.4 }} />
+            ))}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display:"flex", alignItems:"center", gap:4, flexShrink:0 }}>
+          {editing ? (
+            <>
+              <button onClick={commitEdit} className="btn-accent"
+                style={{ borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:700, cursor:"pointer" }}>Save</button>
+              <button onClick={cancelEdit} className="btn-ghost"
+                style={{ borderRadius:8, padding:"6px 10px", fontSize:12, fontWeight:600, cursor:"pointer" }}>Cancel</button>
+            </>
+          ) : (
+            <>
+              <ActionBtn onClick={onToggleExpand} label={isExpanded ? "Collapse" : "Expand"}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: isExpanded ? "rotate(180deg)" : "none", transition:"transform 0.15s ease" }}>
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </ActionBtn>
+              <ActionBtn onClick={startEdit} label="Edit">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </ActionBtn>
+              <ActionBtn onClick={onDelete} label="Delete" danger>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+                </svg>
+              </ActionBtn>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Edit panel */}
+      {editing && (
+        <div style={{ padding:"0 16px 16px 16px", display:"flex", flexDirection:"column", gap:14,
+          borderTop:"1px solid var(--border2)", marginTop:0, paddingTop:14 }}>
+          {/* Icon picker */}
+          <div>
+            <p style={{ fontSize:11, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>Icon</p>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+              {PRESET_ICONS.map(ic => (
+                <button type="button" key={ic.id} onClick={() => setEditIcon(ic.id)}
+                  style={{ width:34, height:34, borderRadius:9, fontSize:16, cursor:"pointer",
+                    border: editIcon === ic.id ? `2px solid ${editColor}` : "1.5px solid var(--border)",
+                    backgroundColor: editIcon === ic.id ? editColor+"1a" : "var(--bg2)",
+                    transition:"all 0.12s ease" }}>
+                  {ic.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Color picker */}
+          <div>
+            <p style={{ fontSize:11, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>Color</p>
+            <div style={{ display:"flex", gap:8 }}>
+              {PRESET_COLORS.map(c => (
+                <button type="button" key={c} onClick={() => setEditColor(c)}
+                  style={{ width:24, height:24, borderRadius:"50%", backgroundColor:c, cursor:"pointer",
+                    border: editColor === c ? "3px solid var(--text)" : "3px solid transparent",
+                    transition:"border 0.12s ease" }} />
+              ))}
+            </div>
+          </div>
+
+          {/* Frequency */}
+          <div>
+            <p style={{ fontSize:11, fontWeight:700, color:"var(--text3)", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:8 }}>Frequency</p>
+            <div style={{ display:"flex", gap:6 }}>
+              {(["daily","weekly","monthly"] as const).map(f => (
+                <button type="button" key={f} onClick={() => setEditFreq(f)}
+                  style={{ padding:"6px 14px", borderRadius:999, fontSize:12, fontWeight:600, cursor:"pointer",
+                    fontFamily:"'JetBrains Mono', monospace", border:"1.5px solid",
+                    borderColor: editFreq === f ? editColor : "var(--border)",
+                    backgroundColor: editFreq === f ? editColor+"1a" : "var(--bg2)",
+                    color: editFreq === f ? editColor : "var(--text3)", transition:"all 0.12s ease" }}>
+                  {f.charAt(0).toUpperCase()+f.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Expanded: simple month view */}
+      {isExpanded && !editing && (
+        <div style={{ borderTop:"1px solid var(--border2)", padding:"16px" }}>
+          <MonthView habit={habit} dates={dates} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionBtn({ children, onClick, label, danger }: {
+  children: React.ReactNode; onClick: () => void; label: string; danger?: boolean;
+}) {
+  const [h, setH] = useState(false);
+  return (
+    <button onClick={onClick} aria-label={label} title={label}
+      onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      style={{ width:30, height:30, borderRadius:8, border:"1px solid", flexShrink:0,
+        borderColor: h && danger ? "var(--warn-bdr)" : h ? "var(--border)" : "transparent",
+        backgroundColor: h && danger ? "var(--warn-bg)" : h ? "var(--bg2)" : "transparent",
+        color: h && danger ? "var(--warn)" : h ? "var(--text)" : "var(--muted)",
+        cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center",
+        transition:"all 0.12s ease" }}>
+      {children}
+    </button>
   );
 }
 
