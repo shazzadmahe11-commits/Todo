@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { useAuth } from "@/context/AuthContext";
 import { Task, Subtask, Recurrence, RECURRENCE_LABELS, isPending, todayStr, dueSoonLabel } from "@/lib/recurrence";
-import { PRESET_CATEGORIES, categoryColor, categoryLabel, groupTasksByCategory } from "@/lib/category";
+import { PRESET_CATEGORIES, categoryColor, categoryLabel, groupTasksByCategory, extractCustomCategories } from "@/lib/category";
 
 const RECURRENCE_OPTIONS: Recurrence[] = ["none", "daily", "weekly", "monthly"];
 type TaskRowDB = { id: string; title: string; recurrence: Recurrence; archived: boolean; due_date: string | null; category: string; created_at: string; };
@@ -83,6 +83,7 @@ export default function TaskBoard() {
 
   const pendingGroups = useMemo(() => groupTasksByCategory(pending), [pending]);
   const doneGroups = useMemo(() => groupTasksByCategory(done), [done]);
+  const customCategories = useMemo(() => extractCustomCategories(tasks), [tasks]);
 
   async function addTask(e: React.FormEvent) {
     e.preventDefault();
@@ -191,7 +192,7 @@ export default function TaskBoard() {
             </div>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 6 }}>Category</label>
-              <CategoryPicker value={category} onChange={setCategory} />
+              <CategoryPicker value={category} onChange={setCategory} customCategories={customCategories} />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -349,42 +350,89 @@ export default function TaskBoard() {
   );
 }
 
-function CategoryPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const isPreset = (PRESET_CATEGORIES as readonly string[]).includes(value.toLowerCase());
-  const [customOpen, setCustomOpen] = useState(!isPreset && value.trim() !== "");
-  const [customVal, setCustomVal] = useState(isPreset ? "" : value);
 
-  useEffect(() => {
-    const preset = (PRESET_CATEGORIES as readonly string[]).includes(value.toLowerCase());
-    if (preset) { setCustomOpen(false); setCustomVal(""); }
-  }, [value]);
+function CategoryPicker({ value, onChange, customCategories }: {
+  value: string;
+  onChange: (v: string) => void;
+  customCategories: string[];
+}) {
+  const [showInput, setShowInput] = useState(false);
+  const [inputVal, setInputVal] = useState("");
+
+  const isPreset = (PRESET_CATEGORIES as readonly string[]).includes(value.trim().toLowerCase());
+  const isCustom = !isPreset && value.trim() !== "";
+  // All pills to show: presets + existing custom ones
+  const allPills = [
+    ...PRESET_CATEGORIES,
+    ...customCategories.filter(c => !(PRESET_CATEGORIES as readonly string[]).includes(c.toLowerCase())),
+  ];
+
+  function handleAddNew(e: React.FormEvent) {
+    e.preventDefault();
+    const v = inputVal.trim();
+    if (!v) return;
+    onChange(v);
+    setInputVal("");
+    setShowInput(false);
+  }
 
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-      {PRESET_CATEGORIES.map(c => (
-        <button type="button" key={c} onClick={() => { onChange(c); setCustomOpen(false); setCustomVal(""); }}
+      {allPills.map(c => {
+        const isSelected = value.trim().toLowerCase() === c.trim().toLowerCase();
+        return (
+          <button type="button" key={c}
+            onClick={() => { onChange(c); setShowInput(false); setInputVal(""); }}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
+              padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              border: "1.5px solid",
+              borderColor: isSelected ? categoryColor(c) : "var(--border)",
+              backgroundColor: isSelected ? categoryColor(c) + "1f" : "var(--bg2)",
+              color: isSelected ? categoryColor(c) : "var(--text3)",
+              transition: "all 0.12s ease",
+            }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: categoryColor(c), flexShrink: 0 }} />
+            {categoryLabel(c)}
+          </button>
+        );
+      })}
+
+      {/* Show selected custom value as a pill if it's not already in allPills */}
+      {isCustom && !customCategories.some(c => c.trim().toLowerCase() === value.trim().toLowerCase()) && (
+        <button type="button"
           style={{
             display: "flex", alignItems: "center", gap: 6, flexShrink: 0,
             padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
-            border: "1.5px solid", borderColor: value.toLowerCase() === c ? categoryColor(c) : "var(--border)",
-            backgroundColor: value.toLowerCase() === c ? categoryColor(c) + "1f" : "var(--bg2)",
-            color: value.toLowerCase() === c ? categoryColor(c) : "var(--text3)", transition: "all 0.12s ease",
+            border: `1.5px solid ${categoryColor(value)}`,
+            backgroundColor: categoryColor(value) + "1f",
+            color: categoryColor(value),
           }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: categoryColor(c), flexShrink: 0 }} />
-          {categoryLabel(c)}
+          <span style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: categoryColor(value), flexShrink: 0 }} />
+          {categoryLabel(value)}
         </button>
-      ))}
-      {customOpen ? (
-        <input autoFocus value={customVal}
-          onChange={e => { setCustomVal(e.target.value); onChange(e.target.value); }}
-          onBlur={() => { if (!customVal.trim()) { setCustomOpen(false); onChange("personal"); } }}
-          placeholder="Custom category…" className="input"
-          style={{ width: 150, padding: "5px 10px", fontSize: 12, flexShrink: 0 }} maxLength={40} />
+      )}
+
+      {/* + New button */}
+      {showInput ? (
+        <form onSubmit={handleAddNew} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input autoFocus value={inputVal} onChange={e => setInputVal(e.target.value)}
+            placeholder="New category…" className="input"
+            style={{ width: 140, padding: "5px 10px", fontSize: 12 }} maxLength={40}
+            onBlur={() => { if (!inputVal.trim()) { setShowInput(false); } }} />
+          <button type="submit" disabled={!inputVal.trim()}
+            style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              backgroundColor: "var(--accent)", color: "white", border: "none" }}>
+            Add
+          </button>
+          <button type="button" onClick={() => { setShowInput(false); setInputVal(""); }}
+            style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+        </form>
       ) : (
-        <button type="button" onClick={() => setCustomOpen(true)}
+        <button type="button" onClick={() => setShowInput(true)}
           style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
             border: "1.5px dashed var(--border)", backgroundColor: "transparent", color: "var(--text3)" }}>
-          + Custom
+          + New
         </button>
       )}
     </div>
@@ -531,7 +579,7 @@ function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSav
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)", display: "block", marginBottom: 6 }}>Category</label>
-            <CategoryPicker value={editCategory} onChange={setEditCategory} />
+            <CategoryPicker value={editCategory} onChange={setEditCategory} customCategories={customCategories} />
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--text3)" }}>Due</label>
