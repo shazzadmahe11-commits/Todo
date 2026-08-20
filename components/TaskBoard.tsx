@@ -370,7 +370,7 @@ function CategoryPicker({ value, onChange, customCategories }: {
   ];
 
   return (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+    <div style={{ display: "flex", gap: 6, alignItems: "center", overflowX: "auto", paddingBottom: 2 }} className="no-scroll">
       {allPills.map(c => {
         const isSelected = value.trim().toLowerCase() === c.trim().toLowerCase();
         return (
