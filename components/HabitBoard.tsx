@@ -148,9 +148,25 @@ export default function HabitBoard() {
   const [submitting, setSubmitting] = useState(false);
   const [expandedHabit, setExpandedHabit] = useState<string | null>(null);
 
-  async function loadAll() {
+  // Supabase/Postgrest errors are plain objects with a `message`/`status`
+  // field, not JS `Error` instances, so we can't rely on `instanceof Error`.
+  function errMsg(e: unknown, fallback: string): string {
+    if (e instanceof Error) return e.message;
+    if (e && typeof e === "object" && "message" in e && typeof (e as { message?: unknown }).message === "string") {
+      return (e as { message: string }).message;
+    }
+    return fallback;
+  }
+
+  function isAuthError(e: unknown): boolean {
+    const msg = errMsg(e, "").toLowerCase();
+    const status = e && typeof e === "object" && "status" in e ? (e as { status?: unknown }).status : undefined;
+    return status === 401 || msg.includes("jwt") || msg.includes("expired") || msg.includes("not authenticated");
+  }
+
+  async function loadAll(isRetry = false) {
     if (!user) return;
-    setLoading(true); setError(null);
+    setLoading(true); if (!isRetry) setError(null);
     try {
       const [{ data: hd, error: he }, { data: cd, error: ce }] = await Promise.all([
         db.from("habits").select("*").order("position", { ascending: true }),
@@ -159,11 +175,28 @@ export default function HabitBoard() {
       if (he) throw he; if (ce) throw ce;
       setHabits(hd ?? []);
       setCompletions(cd ?? []);
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Could not load."); }
-    finally { setLoading(false); }
+      setError(null);
+    } catch (e: unknown) {
+      // A tab left idle in the background can miss its scheduled token
+      // refresh, so the session looks expired the moment you come back.
+      // Refresh it once and retry silently before showing an error.
+      if (!isRetry && isAuthError(e)) {
+        const { data } = await supabase.auth.refreshSession();
+        if (data.session) { await loadAll(true); return; }
+      }
+      setError(errMsg(e, "Could not load."));
+    } finally { setLoading(false); }
   }
 
   useEffect(() => { loadAll(); }, [user]);
+
+  // Refresh data whenever the tab comes back into focus, so a long-idle
+  // session gets new data proactively instead of waiting to error out.
+  useEffect(() => {
+    function onVisible() { if (document.visibilityState === "visible") loadAll(); }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [user]);
 
   // Map habit_id → Set of completed_on dates
   const completionMap = useMemo(() => {
