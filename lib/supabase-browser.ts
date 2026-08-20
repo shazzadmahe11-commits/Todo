@@ -13,5 +13,20 @@ export function getSupabaseBrowserClient() {
     );
   }
   client = createClient<Database>(url, anon);
+
+  // Browsers throttle timers in background/idle tabs, so the client's
+  // scheduled token refresh can be delayed past the token's expiry.
+  // When the tab comes back into focus, force a refresh check right away
+  // instead of letting the next query fail with an expired-session error.
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        client?.auth.startAutoRefresh();
+      } else {
+        client?.auth.stopAutoRefresh();
+      }
+    });
+  }
+
   return client;
 }
