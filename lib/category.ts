@@ -1,16 +1,13 @@
-// Categories: three presets plus freeform custom names typed by the user.
 export const PRESET_CATEGORIES = ["work", "personal", "groceries"] as const;
 export type PresetCategory = (typeof PRESET_CATEGORIES)[number];
 
 const PRESET_COLORS: Record<PresetCategory, string> = {
-  work: "#3b82f6",      // blue
-  personal: "#a855f7",  // purple
-  groceries: "#f59e0b", // amber
+  work:      "#3b82f6",
+  personal:  "#a855f7",
+  groceries: "#f59e0b",
 };
 
-// Stable palette custom categories are hashed into, so the same name
-// always gets the same color without us having to store one.
-const CUSTOM_PALETTE = ["#ef4444", "#14b8a6", "#ec4899", "#84cc16", "#06b6d4", "#f97316", "#6366f1", "#22c55e"];
+const CUSTOM_PALETTE = ["#ef4444","#14b8a6","#ec4899","#84cc16","#06b6d4","#f97316","#6366f1","#22c55e"];
 
 export function categoryColor(category: string | null | undefined): string {
   const key = (category || "personal").trim().toLowerCase();
@@ -44,4 +41,15 @@ export function groupTasksByCategory<T extends { category: string | null }>(list
     return a.localeCompare(b);
   });
   return keys.map(k => ({ category: k, tasks: map.get(k)! }));
+}
+
+// Returns custom category names from tasks (not presets)
+export function extractCustomCategories(tasks: { category: string | null }[]): string[] {
+  const presets = PRESET_CATEGORIES as readonly string[];
+  const seen = new Set<string>();
+  for (const t of tasks) {
+    const key = (t.category || "personal").trim().toLowerCase();
+    if (!presets.includes(key) && key) seen.add(t.category!.trim());
+  }
+  return Array.from(seen).sort();
 }
