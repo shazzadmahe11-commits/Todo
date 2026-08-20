@@ -83,6 +83,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <nav style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <NavLink href="/" label="Today" active={pathname === "/"} />
             <NavLink href="/calendar" label="History" active={pathname === "/calendar"} />
+            <NavLink href="/habits" label="Habits" active={pathname === "/habits"} />
           </nav>
 
           {/* Icon buttons */}
