@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 
 const LIGHT_BG = "#f5faf6";
-const DARK_BG  = "#0d1710";
+const DARK_BG  = "#1a1e1c";
 
 function applyTheme(t: "light" | "dark") {
   document.documentElement.classList.toggle("dark", t === "dark");
@@ -52,14 +52,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         backgroundColor: "var(--bg)",
         borderBottom: "1px solid var(--border2)",
         backdropFilter: "blur(12px)",
+        overflowX: "hidden",
       }}>
-        <div style={{
-          maxWidth: 680, margin: "0 auto", padding: "0 16px",
-          height: 56, display: "flex", alignItems: "center", justifyContent: "space-between",
+        <div className="shell-header-inner" style={{
+          maxWidth: 680, margin: "0 auto",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 8,
         }}>
           {/* Logo + name */}
-          <Link href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-            <div style={{
+          <Link href="/" className="shell-logo" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", flexShrink: 0, minWidth: 0 }}>
+            <div className="shell-logo-icon" style={{
               width: 30, height: 30, borderRadius: 8,
               backgroundColor: "var(--accent)",
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -70,24 +72,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
             </div>
-            <span style={{
+            <span className="shell-logo-text" style={{
               fontFamily: "'Plus Jakarta Sans', sans-serif",
               fontSize: 17, fontWeight: 800,
               color: "var(--text)", letterSpacing: "-0.4px",
+              whiteSpace: "nowrap",
             }}>
-              Kamla<span style={{ color: "var(--accent)" }}>.com</span>
+              Kamla<span className="shell-logo-suffix" style={{ color: "var(--accent)" }}>.com</span>
             </span>
           </Link>
 
           {/* Nav links */}
-          <nav style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <nav className="shell-nav no-scroll" style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0, overflowX: "auto" }}>
             <NavLink href="/" label="Today" active={pathname === "/"} />
             <NavLink href="/calendar" label="History" active={pathname === "/calendar"} />
             <NavLink href="/habits" label="Habits" active={pathname === "/habits"} />
           </nav>
 
           {/* Icon buttons */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
             <IconBtn onClick={toggle} label={theme === "light" ? "Dark mode" : "Light mode"}>
               {theme === "light" ? <MoonIcon /> : <SunIcon />}
             </IconBtn>
@@ -102,6 +105,49 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main style={{ flex: 1, maxWidth: 680, margin: "0 auto", width: "100%", padding: "24px 16px 80px" }}>
         <div className="fade-up">{children}</div>
       </main>
+
+      <style jsx>{`
+        .shell-header-inner {
+          padding: 0 16px;
+          height: 56px;
+        }
+        .shell-nav :global(a) {
+          font-size: 13px;
+          padding: 5px 12px;
+        }
+        @media (max-width: 480px) {
+          .shell-header-inner {
+            padding: 0 10px;
+            height: 52px;
+            gap: 4px;
+          }
+          .shell-logo-icon {
+            width: 26px;
+            height: 26px;
+          }
+          .shell-logo-text {
+            font-size: 15px;
+          }
+          .shell-logo-suffix {
+            display: none;
+          }
+          .shell-nav {
+            gap: 2px;
+          }
+          .shell-nav :global(a) {
+            font-size: 12px;
+            padding: 5px 8px;
+          }
+        }
+        @media (max-width: 360px) {
+          .shell-logo-text {
+            font-size: 14px;
+          }
+          .shell-nav :global(a) {
+            padding: 5px 6px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -110,13 +156,14 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
   return (
     <Link href={href} style={{
       fontFamily: "'Plus Jakarta Sans', sans-serif",
-      fontSize: 13, fontWeight: active ? 700 : 500,
+      fontWeight: active ? 700 : 500,
       color: active ? "var(--accent)" : "var(--text3)",
       textDecoration: "none",
-      padding: "5px 12px",
       borderRadius: 999,
       backgroundColor: active ? "var(--accent-bg)" : "transparent",
       transition: "all 0.15s ease",
+      whiteSpace: "nowrap",
+      flexShrink: 0,
     }}>
       {label}
     </Link>
