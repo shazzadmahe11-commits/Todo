@@ -282,7 +282,8 @@ export default function TaskBoard() {
                             onAddSubtask={st => addSubtask(t.id, st)}
                             onToggleSubtask={toggleSubtask}
                             onDeleteSubtask={deleteSubtask}
-                            onEditSubtask={editSubtask} />
+                            onEditSubtask={editSubtask}
+                            customCategories={customCategories} />
                         ))}
                       </div>
                     )}
@@ -334,7 +335,8 @@ export default function TaskBoard() {
                             onAddSubtask={st => addSubtask(t.id, st)}
                             onToggleSubtask={toggleSubtask}
                             onDeleteSubtask={deleteSubtask}
-                            onEditSubtask={editSubtask} />
+                            onEditSubtask={editSubtask}
+                            customCategories={customCategories} />
                         ))}
                       </div>
                     )}
@@ -439,7 +441,7 @@ function CategoryPicker({ value, onChange, customCategories }: {
   );
 }
 
-function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask, onEditSubtask }: {
+function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSave, onAddSubtask, onToggleSubtask, onDeleteSubtask, onEditSubtask, customCategories }: {
   task: Task; completed?: boolean;
   onComplete?: () => void; onUndo?: () => void; onDelete: () => void;
   onSave: (u: { title?: string; recurrence?: Recurrence; due_date?: string | null; category?: string }) => void;
@@ -447,6 +449,7 @@ function TaskItem({ task, completed = false, onComplete, onUndo, onDelete, onSav
   onToggleSubtask: (id: string, c: boolean) => void;
   onDeleteSubtask: (id: string) => void;
   onEditSubtask: (id: string, title: string) => void;
+  customCategories: string[];
 }) {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(task.title);
