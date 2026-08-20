@@ -369,15 +369,6 @@ function CategoryPicker({ value, onChange, customCategories }: {
     ...customCategories.filter(c => !(PRESET_CATEGORIES as readonly string[]).includes(c.toLowerCase())),
   ];
 
-  function handleAddNew(e: React.FormEvent) {
-    e.preventDefault();
-    const v = inputVal.trim();
-    if (!v) return;
-    onChange(v);
-    setInputVal("");
-    setShowInput(false);
-  }
-
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
       {allPills.map(c => {
@@ -417,19 +408,21 @@ function CategoryPicker({ value, onChange, customCategories }: {
 
       {/* + New button */}
       {showInput ? (
-        <form onSubmit={handleAddNew} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input autoFocus value={inputVal} onChange={e => setInputVal(e.target.value)}
             placeholder="New category…" className="input"
             style={{ width: 140, padding: "5px 10px", fontSize: 12 }} maxLength={40}
+            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); if (inputVal.trim()) { onChange(inputVal.trim()); setInputVal(""); setShowInput(false); } } if (e.key === "Escape") { setShowInput(false); setInputVal(""); } }}
             onBlur={() => { if (!inputVal.trim()) { setShowInput(false); } }} />
-          <button type="submit" disabled={!inputVal.trim()}
+          <button type="button" disabled={!inputVal.trim()}
+            onClick={() => { const v = inputVal.trim(); if (!v) return; onChange(v); setInputVal(""); setShowInput(false); }}
             style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
               backgroundColor: "var(--accent)", color: "white", border: "none" }}>
             Add
           </button>
           <button type="button" onClick={() => { setShowInput(false); setInputVal(""); }}
             style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
-        </form>
+        </div>
       ) : (
         <button type="button" onClick={() => setShowInput(true)}
           style={{ flexShrink: 0, padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: "pointer",
