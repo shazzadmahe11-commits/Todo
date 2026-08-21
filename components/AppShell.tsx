@@ -53,6 +53,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         borderBottom: "1px solid var(--border2)",
         backdropFilter: "blur(12px)",
         overflowX: "hidden",
+        paddingTop: "env(safe-area-inset-top)",
       }}>
         <div className="shell-header-inner shell-width" style={{
           margin: "0 auto",
