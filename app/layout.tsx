@@ -10,13 +10,29 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#0e1013" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="Kamla.com" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var t = localStorage.getItem('theme') || 'light';
+                if (t === 'dark') {
+                  document.documentElement.classList.add('dark');
+                  var bg = '#0e1013';
+                  document.documentElement.style.backgroundColor = bg;
+                  var meta = document.querySelector('meta[name="theme-color"]');
+                  if (meta) meta.setAttribute('content', bg);
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
       </head>
       <body>
         <AuthProvider>
