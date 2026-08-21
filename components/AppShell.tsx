@@ -33,8 +33,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   function toggle() {
     const next = theme === "light" ? "dark" : "light";
-    setTheme(next); applyTheme(next);
     localStorage.setItem("theme", next);
+    window.location.reload();
   }
 
   useEffect(() => {
